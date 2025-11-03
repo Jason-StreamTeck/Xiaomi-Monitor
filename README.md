@@ -26,6 +26,9 @@ python main.py
 | `-v` | `--verbose`       | `bool`         | `False`              | Enable live data logging output in the terminal.                                      |
 | `-m` | `--mode`          | `"w"` or `"a"` | `"w"`                | Choose whether to **write** a new file (`w`) or **append** to an existing file (`a`). |
 |`-api`| `--api`           | `str`          | *None*               | Enable API data posts to a specific server.                                           |
+| `-s` | `--socket`        | `bool`         | *None*               | Enable Socket data transmissions to a specific server.                                |
+| `-sh`| `--socket-host`   | `str`          | *None*               | Host IP address of the Socket server.                                                 |
+| `-sp`| `--socket-port`   | `int`          | *None*               | Host port number of the Socket server.                                                |
 
 5) Repeatedly scan until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list of BLE devices and can be selected.
 
@@ -36,7 +39,12 @@ python main.py
 
 7) Terminate the program as you wish and check the contents of the output CSV file for data.
 
-8) (Optional) Run the server to mock retrieve measurement data
+8) (Optional) Run the API server to mock retrieve measurement data
 ```bash
 uvicorn server:app --reload
+```
+
+9) (Optional) Run the Socket server to mock retrieve measurement data
+```bash
+python socket_server.py
 ```
