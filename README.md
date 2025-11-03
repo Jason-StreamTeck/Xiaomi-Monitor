@@ -40,8 +40,3 @@ python main.py
 ```bash
 uvicorn server:app --reload
 ```
-
-### Next Steps
-
-- Create release
-- Add websocket data transfer option

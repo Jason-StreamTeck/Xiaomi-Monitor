@@ -1,3 +1,4 @@
+import os
 import argparse
 import asyncio
 from bleak import BleakClient
@@ -5,7 +6,11 @@ from bleak import BleakScanner
 from enum import Enum, auto
 from logger import Logger
 from api import API
+from socket_client import SocketClient
 from notification_hub import NotificationHub
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class AppState(Enum):
     SCAN = auto()
@@ -64,18 +69,49 @@ def parse_args():
         type=str,
         help="Enable API data posting and the site address of the API server "
     )
+
+    parser.add_argument(
+        "-s", "--socket",
+        action="store_true",
+        help="Enable data transmission via socket (host and port info can be provided via separate args or env)"
+    )
+    parser.add_argument(
+        "-sh", '--socket-host',
+        type=str,
+        help="IP Address of the socket server"
+    )
+    parser.add_argument(
+        "-sp", "--socket-port",
+        type=int,
+        help="Port number of the socket server"
+    )
     return parser.parse_args()
 
 async def main(args):
     state = AppState.SCAN
     address = None
+    auto_connect = False
+
     hub = NotificationHub()
     logger = Logger(args.file, args.mode, args.verbose)
     hub.register(logger.write_data)
     if args.api:
         api = API(args.api)
         hub.register(api.post_data)
-    auto_connect = False
+    socket_client = None
+    if args.socket:
+        host = args.socket_host or os.getenv("SOCKET_HOST")
+        port = args.socket_port or int(os.getenv("SOCKET_PORT"))
+        
+        if host and port:
+            try:
+                socket_client = SocketClient(host, port)
+                socket_client.connect()
+                hub.register(socket_client.send_data)
+            except Exception as e:
+                print(f"Error occurred:", e)
+        else:
+            print("Host and port information missing, Could not connect to Socket server...")
 
     while True:
         if state == AppState.SCAN:
@@ -146,6 +182,8 @@ async def main(args):
         elif state == AppState.QUIT:
             print("Exiting program...")
             logger.close()
+            if socket_client:
+                socket_client.close()
             break
 
 if __name__ == "__main__":
