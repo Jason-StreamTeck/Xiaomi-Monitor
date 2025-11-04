@@ -13,7 +13,11 @@ conda activate Xiaomi-Monitor
 pip install -r requirements.txt
 ```
 
-4) Run the service
+4) Identify the `example.env` file in the repository and name it `.env` without extension.
+
+5) Fill in the `CHARACTERISTIC` field. Optionally, fill in the `SOCKET_HOST` and `SOCKET_PORT` fields if you wish to enable data transmission via Socket.
+
+6) Run the service
 ```bash
 python main.py
 ```
@@ -30,21 +34,21 @@ python main.py
 | `-sh`| `--socket-host`   | `str`          | *None*               | Host IP address of the Socket server.                                                 |
 | `-sp`| `--socket-port`   | `int`          | *None*               | Host port number of the Socket server.                                                |
 
-5) Repeatedly scan until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list of BLE devices and can be selected.
+7) Repeatedly scan until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list of BLE devices and can be selected.
 
-6) Repeatedly attempt to connect to the BLE device, ignoring the following errors (if program does not exit):
+8) Repeatedly attempt to connect to the BLE device, ignoring the following errors (if program does not exit):
 - `Could not get GATT services: Unreachable`
 - `Device with address ##:##:##:##:##:## was not found.`
 - A Blank Error
 
-7) Terminate the program as you wish and check the contents of the output CSV file for data.
+9) Terminate the program as you wish and check the contents of the output CSV file for data.
 
-8) (Optional) Run the API server to mock retrieve measurement data
+10) (Optional) Run the API server to mock retrieve measurement data
 ```bash
 uvicorn server:app --reload
 ```
 
-9) (Optional) Run the Socket server to mock retrieve measurement data
+11) (Optional) Run the Socket server to mock retrieve measurement data
 ```bash
 python socket_server.py
 ```

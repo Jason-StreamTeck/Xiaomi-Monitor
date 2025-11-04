@@ -1,9 +1,9 @@
 ### Identified both of the below characteristics display the temperature and humidity
 8edfffef-3d1b-9c37-4623-ad7265f14076 ['read', 'notify']
-ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6 ['write']
+ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6 ['notify', 'read']
 
 ### Conclusion
-Use '8edfffef-3d1b-9c37-4623-ad7265f14076' as it offers read and notify properties.
+Use 'ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6' as the other characteristic could not access notify. (To be put into the `CHARACTERISTIC` field of the `.env` file)
 
 ### List of Services and Characteristics provided by `Mi Temperature and Humidity Monitor 2`
 
