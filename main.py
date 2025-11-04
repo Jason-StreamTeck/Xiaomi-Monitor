@@ -17,7 +17,7 @@ class AppState(Enum):
     CONNECT = auto()
     QUIT = auto()
 
-TEMP_HUMID_NOTIFY_READ = 'ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6'
+TEMP_HUMID_NOTIFY_READ = os.getenv('CHARACTERISTIC', 0)
 
 async def scan(duration: float):
     print("Scanning for nearby BLE (Bluetooth Low Energy) devices...")
@@ -69,7 +69,6 @@ def parse_args():
         type=str,
         help="Enable API data posting and the site address of the API server "
     )
-
     parser.add_argument(
         "-s", "--socket",
         action="store_true",
@@ -101,7 +100,7 @@ async def main(args):
     socket_client = None
     if args.socket:
         host = args.socket_host or os.getenv("SOCKET_HOST")
-        port = args.socket_port or int(os.getenv("SOCKET_PORT"))
+        port = args.socket_port or int(os.getenv("SOCKET_PORT", '55555'))
         
         if host and port:
             try:
@@ -148,6 +147,10 @@ async def main(args):
                     event.set()
 
             try:
+                if not address:
+                    print("A device MAC Address has not been provided...")
+                    state = AppState.SCAN
+                    continue
                 print(f"Attempting to connect with device...")
                 async with BleakClient(address) as client:
                     if client.is_connected:

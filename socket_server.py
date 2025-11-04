@@ -18,11 +18,11 @@ def handle_client(connection: socket.socket, address: Tuple[str, int]):
                 decoded = json.loads(data.decode('utf-8'))
                 print(f"Received from {address}: {decoded}")
             except Exception as e:
-                print("Error occured:". e)
+                print("Error occured:", e)
 
 def main():
     host = os.getenv("SOCKET_HOST")
-    port = int(os.getenv("SOCKET_PORT"))
+    port = int(os.getenv("SOCKET_PORT", '55555'))
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((host, port))
     server.listen()

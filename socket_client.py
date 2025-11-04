@@ -21,7 +21,8 @@ class SocketClient:
         while self.running:
             try:
                 msg = self.msgs.get(timeout=1)
-                self.sock.sendall(msg.encode('utf-8'))
+                if self.sock:
+                    self.sock.sendall(msg.encode('utf-8'))
             except queue.Empty:
                 continue
             except Exception as e:
