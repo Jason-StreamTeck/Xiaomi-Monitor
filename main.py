@@ -17,7 +17,7 @@ class AppState(Enum):
     CONNECT = auto()
     QUIT = auto()
 
-TEMP_HUMID_NOTIFY_READ = os.getenv('CHARACTERISTIC', 0)
+NOTIFY_CHAR = os.getenv('CHARACTERISTIC', 0)
 
 async def scan(duration: float):
     print("Scanning for nearby BLE (Bluetooth Low Energy) devices...")
@@ -37,19 +37,19 @@ def parse_args():
         description="Xiaomi Temperature and Humidity Monitor 2"
     )
     parser.add_argument(
-        "-d", "--scan-duration",
+        "-t", "--scan-timeout",
         type=float,
         default=10.0,
         help="How long (seconds) for each scan of BLE devices (default = 10)"
     )
     parser.add_argument(
-        "-f", "--file",
+        "-o", "--output-file",
         type=str,
-        default="monitor_data.csv",
+        default="monitor_data",
         help="The name of the CSV file to output data into"
     )
     parser.add_argument(
-        "-a", "--address",
+        "-a", "--mac-address",
         type=str,
         help="The MAC Address of the BLE device to connect and enables end-to-end automatic service"
     )
@@ -59,7 +59,7 @@ def parse_args():
         help="Enable visual logging of data in the terminal"
     )
     parser.add_argument(
-        "-m", "--mode",
+        "-m", "--file-mode",
         type=str,
         default="w",
         help="Option to write or append to the output CSV file"
@@ -142,7 +142,7 @@ async def main(args):
         elif state == AppState.CONNECT:
             event = asyncio.Event()
             def action_input():
-                action = input(f"Receiving data from {TEMP_HUMID_NOTIFY_READ}... Enter [q] to stop notification.\n")
+                action = input(f"Receiving data from {NOTIFY_CHAR}... Enter [q] to stop notification.\n")
                 if action == "q":
                     event.set()
 
@@ -155,10 +155,10 @@ async def main(args):
                 async with BleakClient(address) as client:
                     if client.is_connected:
                         print(f"Successfully established a connection with {address}.")
-                        await client.start_notify(TEMP_HUMID_NOTIFY_READ, hub.notify)
+                        await client.start_notify(NOTIFY_CHAR, hub.notify)
                         asyncio.get_event_loop().run_in_executor(None, action_input)
                         await event.wait()
-                        await client.stop_notify(TEMP_HUMID_NOTIFY_READ)
+                        await client.stop_notify(NOTIFY_CHAR)
                         state = AppState.QUIT
 
             except Exception as e:

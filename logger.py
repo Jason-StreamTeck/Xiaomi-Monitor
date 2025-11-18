@@ -1,9 +1,8 @@
 import csv
-from bleak.backends.characteristic import BleakGATTCharacteristic
 
 class Logger:
     def __init__(self, filename, action, verbose):
-        self.file = open(filename, action, newline="")
+        self.file = open(filename + '.csv', action, newline="", buffering=1)
         self.writer = csv.writer(self.file)
         self.verbose = verbose
         if action == "w":

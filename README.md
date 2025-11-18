@@ -24,11 +24,11 @@ python main.py
 
 | Flag | Long Form         | Type           | Default              | Description                                                                           |
 | ---- | ----------------- | -------------- | -------------------- | ------------------------------------------------------------------------------------- |
-| `-d` | `--scan-duration` | `float`        | `10.0`               | Duration (in seconds) for each BLE scan.                                              |
-| `-f` | `--file`          | `str`          | `"monitor_data.csv"` | Name of the CSV file for storing logged data.                                         |
+| `-t` | `--scan-timeout`  | `float`        | `10.0`               | Duration (in seconds) for each BLE scan.                                              |
+| `-o` | `--output-file`   | `str`          | `"monitor_data"`     | Name of the CSV file for storing logged data.                                         |
 | `-a` | `--address`       | `str`          | *None*               | Optional MAC address of the BLE device to connect directly (skips all services).      |
 | `-v` | `--verbose`       | `bool`         | `False`              | Enable live data logging output in the terminal.                                      |
-| `-m` | `--mode`          | `"w"` or `"a"` | `"w"`                | Choose whether to **write** a new file (`w`) or **append** to an existing file (`a`). |
+| `-m` | `--file-mode`     | `"w"` or `"a"` | `"w"`                | Choose whether to **write** a new file (`w`) or **append** to an existing file (`a`). |
 |`-api`| `--api`           | `str`          | *None*               | Enable API data posts to a specific server.                                           |
 | `-s` | `--socket`        | `bool`         | *None*               | Enable Socket data transmissions to a specific server.                                |
 | `-sh`| `--socket-host`   | `str`          | *None*               | Host IP address of the Socket server.                                                 |
@@ -41,14 +41,16 @@ python main.py
 - `Device with address ##:##:##:##:##:## was not found.`
 - A Blank Error
 
-9) Terminate the program as you wish and check the contents of the output CSV file for data.
+9) Check the contents of the output CSV file for updated data.
 
-10) (Optional) Run the API server to mock retrieve measurement data
+10) Terminate the program.
+
+11) (Optional) Run the API server to mock retrieve measurement data
 ```bash
 uvicorn server:app --reload
 ```
 
-11) (Optional) Run the Socket server to mock retrieve measurement data
+12) (Optional) Run the Socket server to mock retrieve measurement data
 ```bash
 python socket_server.py
 ```
