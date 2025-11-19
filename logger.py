@@ -11,7 +11,7 @@ class Logger:
     def write_data(self, timestamp, temp, humid, bat):
         self.writer.writerow([timestamp, temp, humid, bat])
         if (self.verbose):
-            print(f"{timestamp:18} | Temperature: {temp:3.1f}°C | Humidity: {humid:2}% | Battery: {bat:2}%")
+            print(f"[Data] Timestamp: {timestamp:18} | Temperature: {temp:3.1f}°C | Humidity: {humid:2}% | Battery: {bat:2}%")
     
     def close(self):
         self.file.close()

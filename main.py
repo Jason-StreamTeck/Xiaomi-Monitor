@@ -5,7 +5,7 @@ from bleak import BleakClient
 from bleak import BleakScanner
 from enum import Enum, auto
 from logger import Logger
-from api import API
+from api_server import api_sub, app, handle_api_server, shutdown_api_server
 from socket_client import SocketClient
 from notification_hub import NotificationHub
 from dotenv import load_dotenv
@@ -19,9 +19,9 @@ class AppState(Enum):
 
 NOTIFY_CHAR = os.getenv('CHARACTERISTIC', 0)
 
-async def scan(duration: float):
+async def scan(timeout: float):
     print("Scanning for nearby BLE (Bluetooth Low Energy) devices...")
-    devices = await BleakScanner.discover(timeout=duration)
+    devices = await BleakScanner.discover(timeout=timeout)
 
     if not devices:
         print("No devices found. Please try moving the device closer and rescan.")
@@ -49,7 +49,7 @@ def parse_args():
         help="The name of the CSV file to output data into"
     )
     parser.add_argument(
-        "-a", "--mac-address",
+        "-mac", "--mac-address",
         type=str,
         help="The MAC Address of the BLE device to connect and enables end-to-end automatic service"
     )
@@ -65,9 +65,14 @@ def parse_args():
         help="Option to write or append to the output CSV file"
     )
     parser.add_argument(
-        "-api", "--api",
+        "-api", "--enable-api",
+        action="store_true",
+        help="Enable API server hosting"
+    )
+    parser.add_argument(
+        '--api-url',
         type=str,
-        help="Enable API data posting and the site address of the API server "
+        help="IP address (host) of the API server "
     )
     parser.add_argument(
         "-s", "--socket",
@@ -77,7 +82,7 @@ def parse_args():
     parser.add_argument(
         "-sh", '--socket-host',
         type=str,
-        help="IP Address of the socket server"
+        help="IP Address (host) of the socket server"
     )
     parser.add_argument(
         "-sp", "--socket-port",
@@ -90,13 +95,15 @@ async def main(args):
     state = AppState.SCAN
     address = None
     auto_connect = False
-
     hub = NotificationHub()
-    logger = Logger(args.file, args.mode, args.verbose)
+
+    logger = Logger(args.output_file, args.file_mode, args.verbose)
     hub.register(logger.write_data)
-    if args.api:
-        api = API(args.api)
-        hub.register(api.post_data)
+
+    if args.enable_api:
+        hub.register(api_sub)
+        server_task, shutdown_event, server = await handle_api_server(args.api_url)
+
     socket_client = None
     if args.socket:
         host = args.socket_host or os.getenv("SOCKET_HOST")
@@ -114,12 +121,12 @@ async def main(args):
 
     while True:
         if state == AppState.SCAN:
-            if (args.address):
+            if (args.mac_address):
                 address = args.address
                 state = AppState.CONNECT
                 continue
 
-            devices = await scan(args.scan_duration)
+            devices = await scan(args.scan_timeout)
 
             action = input(f"\nPlease enter your next course of action.\n1) A device number [1-{len(devices)}]\n2) [r] to rescan\n3) [q] to quit\nInput: ").strip().lower()
             if action == "r":
@@ -163,7 +170,7 @@ async def main(args):
 
             except Exception as e:
                 print(f"Error occurred: {e}")
-                if auto_connect or args.address:
+                if auto_connect or args.mac_address:
                     print()
                     continue
 
@@ -183,10 +190,11 @@ async def main(args):
                     print("Invalid input, please try again.")
 
         elif state == AppState.QUIT:
-            print("Exiting program...")
             logger.close()
             if socket_client:
                 socket_client.close()
+            await shutdown_api_server(server_task, server)
+            print("Exiting program...")
             break
 
 if __name__ == "__main__":

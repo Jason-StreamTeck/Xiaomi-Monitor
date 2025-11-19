@@ -10,8 +10,12 @@ class NotificationHub:
         self.subs.append(sub)
 
     def notify(self, characteristic: BleakGATTCharacteristic, data: bytearray):
+        ts = time.time()
+        temp = self._decode_temp(data)
+        humid = self._decode_humid(data)
+        bat = self._decode_volt(data)
         for sub in self.subs:
-            sub(time.time(), self._decode_temp(data), self._decode_humid(data), self._decode_volt(data))
+            sub(ts, temp, humid, bat)
 
     # Decoding logic was obtained from the MiTemperature2 repository by JsBergbau
 
