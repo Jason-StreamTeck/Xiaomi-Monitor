@@ -1,45 +1,46 @@
 from fastapi import FastAPI
 from models import Measurement
 from urllib.parse import urlparse
-from typing import Tuple
 import uvicorn
 import asyncio
 
-app = FastAPI()
+class APIServer:
+    def __init__(self):
+        self.app = FastAPI()
+        self.latest_data: Measurement | None = None
+        self.data_history: list[Measurement] = []
+        
+        self.app.get("/data")(self.get_latest_data)
+        self.app.get("/history")(self.get_data_history)
 
-latest_data: Measurement | None = None
-data_history: list[Measurement] = []
+        self.server: uvicorn.Server | None = None
+        self.task: asyncio.Task | None = None
+    
+    def sub(self, ts, temp, humid, bat):
+        measurement = Measurement(
+            timestamp=ts,
+            temperature=temp,
+            humidity=humid,
+            battery=bat
+        )
+        self.latest_data = measurement
+        self.data_history.append(measurement)
+    
+    def get_latest_data(self):
+        return self.latest_data
+    
+    def get_data_history(self):
+        return self.data_history
+    
+    async def start(self, uri: str):
+        parsed = urlparse(uri)
+        host, port = parsed.hostname, parsed.port
 
-def api_sub(ts, temp, humid, bat):
-    global latest_data
-    measurement = Measurement(
-        timestamp=ts,
-        temperature=temp,
-        humidity=humid,
-        battery=bat
-    )
-    latest_data = measurement
-    data_history.append(measurement)
-
-async def handle_api_server(uri: str) -> Tuple[asyncio.Task, asyncio.Event, uvicorn.Server]:
-    parsed = urlparse(uri)
-    host, port = parsed.hostname, parsed.port
-
-    shutdown_event = asyncio.Event()
-    config = uvicorn.Config(app, host=host, port=port, log_config=None)
-    server = uvicorn.Server(config)
-    server_task = asyncio.create_task(server.serve())
-
-    return server_task, shutdown_event, server
-
-async def shutdown_api_server(server_task: asyncio.Task, server: uvicorn.Server):
-    server.should_exit = True
-    await server_task
-
-@app.get("/data")
-def get_latest_data():
-    return latest_data
-
-@app.get("/history")
-def get_history():
-    return data_history
+        config = uvicorn.Config(self.app, host=host, port=port, log_config=None)
+        self.server = uvicorn.Server(config)
+        self.task = asyncio.create_task(self.server.serve())
+        return self
+    
+    async def close(self):
+        self.server.should_exit = True
+        await self.task

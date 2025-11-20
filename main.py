@@ -5,7 +5,7 @@ from bleak import BleakClient
 from bleak import BleakScanner
 from enum import Enum, auto
 from logger import Logger
-from api_server import api_sub, app, handle_api_server, shutdown_api_server
+from api_server import APIServer
 from socket_client import SocketClient
 from notification_hub import NotificationHub
 from dotenv import load_dotenv
@@ -101,8 +101,9 @@ async def main(args):
     hub.register(logger.write_data)
 
     if args.enable_api:
-        hub.register(api_sub)
-        server_task, shutdown_event, server = await handle_api_server(args.api_url)
+        api_server = APIServer();
+        hub.register(api_server.sub)
+        await api_server.start(args.api_url)
 
     socket_client = None
     if args.socket:
@@ -193,7 +194,8 @@ async def main(args):
             logger.close()
             if socket_client:
                 socket_client.close()
-            await shutdown_api_server(server_task, server)
+            if args.enable_api:
+                await api_server.close()
             print("Exiting program...")
             break
 
