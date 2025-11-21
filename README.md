@@ -20,19 +20,29 @@ pip install -r requirements.txt
 6) Run the service
 ```bash
 python main.py
+
+# Example usage
+python main.py -t 5 -o data -v
+
+# Example usage for API options
+python main.py -api --api-url http://localhost:6123
+
+# Example usage for Socket options
+python main.py -s -sh 127.0.0.1 -sp 55555
 ```
 
-| Flag | Long Form         | Type           | Default              | Description                                                                           |
-| ---- | ----------------- | -------------- | -------------------- | ------------------------------------------------------------------------------------- |
-| `-t` | `--scan-timeout`  | `float`        | `10.0`               | Duration (in seconds) for each BLE scan.                                              |
-| `-o` | `--output-file`   | `str`          | `"monitor_data"`     | Name of the CSV file for storing logged data.                                         |
-| `-a` | `--address`       | `str`          | *None*               | Optional MAC address of the BLE device to connect directly (skips all services).      |
-| `-v` | `--verbose`       | `bool`         | `False`              | Enable live data logging output in the terminal.                                      |
-| `-m` | `--file-mode`     | `"w"` or `"a"` | `"w"`                | Choose whether to **write** a new file (`w`) or **append** to an existing file (`a`). |
-|`-api`| `--api`           | `str`          | *None*               | Enable API data posts to a specific server.                                           |
-| `-s` | `--socket`        | `bool`         | *None*               | Enable Socket data transmissions to a specific server.                                |
-| `-sh`| `--socket-host`   | `str`          | *None*               | Host IP address of the Socket server.                                                 |
-| `-sp`| `--socket-port`   | `int`          | *None*               | Host port number of the Socket server.                                                |
+| Flag   | Long Form         | Type           | Default              | Description                                                                           |
+| ------ | ---------------- | -------------- | ------------------ | ------------------------------------------------------------------------------------- |
+| `-t`   | `--scan-timeout`  | `float`        | `10.0`             | Duration (in seconds) for each BLE scan.                                              |
+| `-mac` | `--mac-address`   | `str`          | *None*             | Optional MAC address of the BLE device to connect directly (enables end-to-end service). |
+| `-o`   | `--output-file`   | `str`          | `"monitor_data"`   | Name of the CSV file for storing logged data.                                         |
+| `-m`   | `--file-mode`     | `"w"` or `"a"` | `"w"`              | Choose whether to **write** a new file (`w`) or **append** to an existing file (`a`). |
+| `-v`   | `--verbose`       | `bool`         | `False`            | Enable live data logging output in the terminal.                                      |
+| `-api` | `--enable-api`    | `bool`         | `False`            | Enable API server for data transmission.                                              |
+| *None* | `--api-url`       | `str`          | *None*             | IP address (host) of the API server.                                                 |
+| `-s`   | `--enable-socket` | `bool`         | `False`            | Enable Socket server for data transmission.                                           |
+| `-sh`  | `--socket-host`   | `str`          | *None*             | Host IP address of the Socket server.                                                |
+| `-sp`  | `--socket-port`   | `int`          | *None*             | Host port number of the Socket server.                                               |
 
 7) Repeatedly scan until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list of BLE devices and can be selected.
 
@@ -45,12 +55,12 @@ python main.py
 
 10) Terminate the program.
 
-11) (Optional) Run the API server to mock retrieve measurement data
+11) (Optional) Run the dummy API client to mock retrieve measurement data
 ```bash
-uvicorn server:app --reload
+python api_client.py
 ```
 
-12) (Optional) Run the Socket server to mock retrieve measurement data
+12) (Optional) Run the dummy Socket client to mock retrieve measurement data
 ```bash
-python socket_server.py
+python socket_client.py
 ```

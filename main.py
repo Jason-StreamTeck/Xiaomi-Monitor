@@ -36,14 +36,22 @@ async def scan(timeout: float):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Xiaomi Temperature and Humidity Monitor 2"
+        description="Xiaomi Temperature and Humidity Monitor 2",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
+    # BLE Options
     parser.add_argument(
         "-t", "--scan-timeout",
         type=float,
         default=10.0,
-        help="How long (seconds) for each scan of BLE devices (default = 10)"
+        help="Duration (seconds) of each scan to find BLE devices"
     )
+    parser.add_argument(
+        "-mac", "--mac-address",
+        type=str,
+        help="The MAC Address of the BLE device to connect to (enables end-to-end service)"
+    )
+    # Logging options
     parser.add_argument(
         "-o", "--output-file",
         type=str,
@@ -51,21 +59,18 @@ def parse_args():
         help="The name of the CSV file to output data into"
     )
     parser.add_argument(
-        "-mac", "--mac-address",
+        "-m", "--file-mode",
         type=str,
-        help="The MAC Address of the BLE device to connect and enables end-to-end automatic service"
+        choices=["w", "a"],
+        default="w",
+        help="Option to write or append to the output CSV file"
     )
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Enable visual logging of data in the terminal"
     )
-    parser.add_argument(
-        "-m", "--file-mode",
-        type=str,
-        default="w",
-        help="Option to write or append to the output CSV file"
-    )
+    # Data transmission service options
     parser.add_argument(
         "-api", "--enable-api",
         action="store_true",
