@@ -8,7 +8,7 @@ conda create -n Xiaomi-Monitor python=3.10 -y
 conda activate Xiaomi-Monitor
 ```
 
-3) Install dependencies
+3) Navigate to the root directory and install dependencies
 ```bash
 pip install -r requirements.txt
 ```
@@ -19,6 +19,7 @@ pip install -r requirements.txt
 
 6) Run the service
 ```bash
+cd src
 python main.py
 
 # Example usage
@@ -41,8 +42,8 @@ python main.py -s -sh 127.0.0.1 -sp 55555
 | `-api` | `--enable-api`    | `bool`         | `False`            | Enable API server for data transmission.                                              |
 | *None* | `--api-url`       | `str`          | *None*             | IP address (host) of the API server.                                                 |
 | `-s`   | `--enable-socket` | `bool`         | `False`            | Enable Socket server for data transmission.                                           |
-| `-sh`  | `--socket-host`   | `str`          | *None*             | Host IP address of the Socket server.                                                |
-| `-sp`  | `--socket-port`   | `int`          | *None*             | Host port number of the Socket server.                                               |
+| `-th`  | `--tcp-host`   | `str`          | *None*             | Host IP address of the Socket server.                                                |
+| `-tp`  | `--tcp-port`   | `int`          | *None*             | Host port number of the Socket server.                                               |
 
 7) Repeatedly scan until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list of BLE devices and can be selected.
 
@@ -57,10 +58,10 @@ python main.py -s -sh 127.0.0.1 -sp 55555
 
 11) (Optional) Run the dummy API client to mock retrieve measurement data
 ```bash
-python api_client.py
+python ./clients/api_client.py
 ```
 
 12) (Optional) Run the dummy Socket client to mock retrieve measurement data
 ```bash
-python socket_client.py
+python ./clients/socket_client.py
 ```

@@ -4,9 +4,7 @@ import asyncio
 from bleak import BleakClient
 from bleak import BleakScanner
 from enum import Enum, auto
-from logger import Logger
-from api_server import APIServer
-from socket_server import SocketServer
+from services import APIServer, SocketServer, FileLogger
 from notification_hub import NotificationHub
 from dotenv import load_dotenv
 
@@ -36,6 +34,7 @@ async def scan(timeout: float):
 
 def parse_args():
     parser = argparse.ArgumentParser(
+        prog="Monitor",
         description="Xiaomi Temperature and Humidity Monitor 2",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -87,12 +86,12 @@ def parse_args():
         help="Enable data transmission via socket hosting"
     )
     parser.add_argument(
-        "-sh", '--socket-host',
+        "-th", '--tcp-host',
         type=str,
         help="IP Address (host) of the socket server"
     )
     parser.add_argument(
-        "-sp", "--socket-port",
+        "-tp", "--tcp-port",
         type=int,
         help="Port number of the socket server"
     )
@@ -104,24 +103,27 @@ async def main(args):
     auto_connect = False
     hub = NotificationHub()
 
-    logger = Logger(args.output_file, args.file_mode, args.verbose)
-    hub.register(logger.write_data)
+    logger = FileLogger(args.output_file, args.file_mode, args.verbose)
+    hub.register(logger.sub)
 
-    if args.enable_api and args.api_url:
-        api_server = APIServer();
-        hub.register(api_server.sub)
-        await api_server.start(args.api_url)
+    if args.enable_api:
+        if args.api_url:
+            api_server = APIServer();
+            hub.register(api_server.sub)
+            await api_server.start(args.api_url)
+        else:
+            print("[API] Server could not initiate, url was not provided...")
 
     if args.enable_socket:
-        host = args.socket_host or SOCKET_HOST
-        port = args.socket_port or SOCKET_PORT
+        host = args.tcp_host or SOCKET_HOST
+        port = args.tcp_port or SOCKET_PORT
         
         if host and port:
             socket_server = SocketServer(host, port)
             hub.register(socket_server.sub)
             await socket_server.start()
         else:
-            print("[Socket] Server could not initiate, host and port information missing...")
+            print("[Socket] Server could not initiate, host and port was not provided...")
 
     while True:
         if state == AppState.SCAN:
@@ -195,7 +197,7 @@ async def main(args):
 
         elif state == AppState.QUIT:
             logger.close()
-            if args.enable_socket and (args.socket_host or SOCKET_HOST) and (args.socket_port or SOCKET_PORT):
+            if args.enable_socket and (args.tcp_host or SOCKET_HOST) and (args.tcp_port or SOCKET_PORT):
                 await socket_server.close()
             if args.enable_api and args.api_url:
                 await api_server.close()
