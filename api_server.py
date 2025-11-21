@@ -16,7 +16,7 @@ class APIServer:
         self.server: uvicorn.Server | None = None
         self.task: asyncio.Task | None = None
     
-    def sub(self, ts, temp, humid, bat):
+    def sub(self,ts: float, temp: float, humid: int, bat: int):
         measurement = Measurement(
             timestamp=ts,
             temperature=temp,

@@ -1,5 +1,7 @@
 import sys
 import time
+import asyncio
+import inspect
 from bleak.backends.characteristic import BleakGATTCharacteristic
 
 class NotificationHub:
@@ -15,7 +17,10 @@ class NotificationHub:
         humid = self._decode_humid(data)
         bat = self._decode_volt(data)
         for sub in self.subs:
-            sub(ts, temp, humid, bat)
+            if inspect.iscoroutinefunction(sub):
+                asyncio.create_task(sub(ts, temp, humid, bat))
+            else:
+                sub(ts, temp, humid, bat)
 
     # Decoding logic was obtained from the MiTemperature2 repository by JsBergbau
 

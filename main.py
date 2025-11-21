@@ -6,7 +6,7 @@ from bleak import BleakScanner
 from enum import Enum, auto
 from logger import Logger
 from api_server import APIServer
-from socket_client import SocketClient
+from socket_server import SocketServer
 from notification_hub import NotificationHub
 from dotenv import load_dotenv
 
@@ -18,6 +18,8 @@ class AppState(Enum):
     QUIT = auto()
 
 NOTIFY_CHAR = os.getenv('CHARACTERISTIC', 0)
+SOCKET_HOST = os.getenv("SOCKET_HOST")
+SOCKET_PORT = int(os.getenv("SOCKET_PORT", '55555'))
 
 async def scan(timeout: float):
     print("Scanning for nearby BLE (Bluetooth Low Energy) devices...")
@@ -67,7 +69,7 @@ def parse_args():
     parser.add_argument(
         "-api", "--enable-api",
         action="store_true",
-        help="Enable API server hosting"
+        help="Enable data transmission via API server hosting"
     )
     parser.add_argument(
         '--api-url',
@@ -75,9 +77,9 @@ def parse_args():
         help="IP address (host) of the API server "
     )
     parser.add_argument(
-        "-s", "--socket",
+        "-s", "--enable-socket",
         action="store_true",
-        help="Enable data transmission via socket (host and port info can be provided via separate args or env)"
+        help="Enable data transmission via socket hosting"
     )
     parser.add_argument(
         "-sh", '--socket-host',
@@ -100,30 +102,26 @@ async def main(args):
     logger = Logger(args.output_file, args.file_mode, args.verbose)
     hub.register(logger.write_data)
 
-    if args.enable_api:
+    if args.enable_api and args.api_url:
         api_server = APIServer();
         hub.register(api_server.sub)
         await api_server.start(args.api_url)
 
-    socket_client = None
-    if args.socket:
-        host = args.socket_host or os.getenv("SOCKET_HOST")
-        port = args.socket_port or int(os.getenv("SOCKET_PORT", '55555'))
+    if args.enable_socket:
+        host = args.socket_host or SOCKET_HOST
+        port = args.socket_port or SOCKET_PORT
         
         if host and port:
-            try:
-                socket_client = SocketClient(host, port)
-                socket_client.connect()
-                hub.register(socket_client.send_data)
-            except Exception as e:
-                print(f"Error occurred:", e)
+            socket_server = SocketServer(host, port)
+            hub.register(socket_server.sub)
+            await socket_server.start()
         else:
-            print("Host and port information missing, Could not connect to Socket server...")
+            print("[Socket] Server could not initiate, host and port information missing...")
 
     while True:
         if state == AppState.SCAN:
             if (args.mac_address):
-                address = args.address
+                address = args.mac_address
                 state = AppState.CONNECT
                 continue
 
@@ -192,9 +190,9 @@ async def main(args):
 
         elif state == AppState.QUIT:
             logger.close()
-            if socket_client:
-                socket_client.close()
-            if args.enable_api:
+            if args.enable_socket and (args.socket_host or SOCKET_HOST) and (args.socket_port or SOCKET_PORT):
+                await socket_server.close()
+            if args.enable_api and args.api_url:
                 await api_server.close()
             print("Exiting program...")
             break

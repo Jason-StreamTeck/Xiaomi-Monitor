@@ -1,42 +1,65 @@
-import os
-import socket
-import threading
 import json
+import asyncio
+from models import Measurement
 from dotenv import load_dotenv
-from typing import Tuple
+from typing import Set
 
 load_dotenv()
 
-def handle_client(connection: socket.socket, address: Tuple[str, int]):
-    print(f"Connected to {address}")
-    with connection:
-        while True:
-            data = connection.recv(1024)
-            if not data:
-                break
+class SocketServer:
+    def __init__(self, host: str, port: int):
+        self.host = host
+        self.port = port
+        self.clients: Set[asyncio.StreamWriter] = set()
+        self.server: asyncio.Server | None = None
+
+    async def start(self):
+        self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
+        print(f"[Socket] Listening on {self.host}:{self.port}...")
+        return self.server
+    
+    async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        address = writer.get_extra_info("peername")
+        print(f"[Socket] Client {address} connected.")
+        self.clients.add(writer)
+
+        try:
+            while True:
+                data = await reader.read(1024)
+                if not data:
+                    break
+        except asyncio.CancelledError:
+            pass
+        except (ConnectionResetError, OSError):
+            print(f"[Socket] Client {address} disconnected.")
+            pass
+        except Exception as e:
+            print(f"[Socket] Error occurred:", e)
+
+    async def broadcast(self, data: Measurement):
+        payload = json.dumps(data.model_dump()).encode('utf-8')
+        for client in self.clients.copy():
             try:
-                decoded = json.loads(data.decode('utf-8'))
-                print(f"Received from {address}: {decoded}")
-            except Exception as e:
-                print("Error occured:", e)
+                client.write(payload)
+                await client.drain()
+            except Exception:
+                self.clients.discard(client)
 
-def main():
-    host = os.getenv("SOCKET_HOST")
-    port = int(os.getenv("SOCKET_PORT", '55555'))
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((host, port))
-    server.listen()
-    print(f"Server listening on {host}:{port}...")
+    async def sub(self, ts: float, temp: float, humid: int, bat: int):
+        measurement = Measurement(
+            timestamp=ts,
+            temperature=temp,
+            humidity=humid,
+            battery=bat
+        )
+        await self.broadcast(measurement)
 
-    try:
-        while True:
-            connection, address = server.accept()
-            thread = threading.Thread(target=handle_client, args=(connection, address), daemon=True)
-            thread.start()
-    except Exception as e:
-        print("Error occurred:", e)
-    finally:
-        server.close()
+    async def close(self):
+        for client in self.clients:
+            client.close()
+            await client.wait_closed()
+        self.clients.clear()
 
-if __name__ == "__main__":
-    main()
+        if self.server:
+            self.server.close()
+            await self.server.wait_closed()
