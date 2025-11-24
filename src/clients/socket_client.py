@@ -22,7 +22,7 @@ class SocketClient:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
         self.running = True
-        print(f"Client connected to {self.host}:{self.port}")
+        print(f"[TCP Client] Connected to {self.host}:{self.port}.")
         threading.Thread(target=self._recv_loop, daemon=True).start()
 
     def _recv_loop(self):
@@ -31,8 +31,7 @@ class SocketClient:
                 data = self.sock.recv(1024)
                 if not data:
                     break
-                decoded = json.loads(data.decode('utf-8'))
-                self.callback(decoded)
+                self.callback(data)
             except Exception as e:
                 print(f"Error occurred:", e)
     
@@ -41,18 +40,20 @@ class SocketClient:
         if self.sock:
             self.sock.close()
 
-def handle_data(msg: dict):
-    print("Data recieved:", msg)
+def handle_data(data: dict):
+    print("Data recieved:", json.loads(data.decode('utf-8')))
 
 async def main():
     client = SocketClient(SOCKET_HOST, SOCKET_PORT, handle_data)
     client.connect()
 
     try:
-        while True:
-            # keep the main thread alive
-            await asyncio.sleep(1)
-    except KeyboardInterrupt:
-        client.close()
+        await asyncio.Event().wait()
+    finally:
+        await client.close()
 
-asyncio.run(main())
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("[TCP Client] Closing connection...")

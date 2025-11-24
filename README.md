@@ -15,7 +15,10 @@ pip install -r requirements.txt
 
 4) Identify the `example.env` file in the repository and name it `.env` without extension.
 
-5) Fill in the `CHARACTERISTIC` field. Optionally, fill in the `SOCKET_HOST` and `SOCKET_PORT` fields if you wish to enable data transmission via Socket.
+5) Fill in the `CHARACTERISTIC` field.
+
+- Optionally, fill `SOCKET_HOST` and `SOCKET_PORT` fields for Socket data transmission.
+- Optionally, fill `WEBSOCKET_HOST` and `WEBSOCKET_PORT` fields WebSocket data transmission.
 
 6) Run the service
 ```bash
@@ -44,6 +47,9 @@ python main.py -s -sh 127.0.0.1 -sp 55555
 | `-s`   | `--enable-socket` | `bool`         | `False`            | Enable Socket server for data transmission.                                           |
 | `-th`  | `--tcp-host`   | `str`          | *None*             | Host IP address of the Socket server.                                                |
 | `-tp`  | `--tcp-port`   | `int`          | *None*             | Host port number of the Socket server.                                               |
+| `-ws`       | `--enable-websocket` | `bool`         | `False`          | Enable WebSocket server for real-time data transmission.                                 |
+| `-wsh`      | `--ws-host`          | `str`          | *None*           | Host IP address of the WebSocket server.                                                 |
+| `-wsp`      | `--ws-port`          | `int`          | *None*           | Port number of the WebSocket server.                                                     |
 
 7) Repeatedly scan until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list of BLE devices and can be selected.
 

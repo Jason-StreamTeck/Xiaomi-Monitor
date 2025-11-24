@@ -4,7 +4,7 @@ import asyncio
 from bleak import BleakClient
 from bleak import BleakScanner
 from enum import Enum, auto
-from services import APIServer, SocketServer, FileLogger
+from services import APIServer, SocketServer, WebSocketServer, FileLogger
 from notification_hub import NotificationHub
 from dotenv import load_dotenv
 
@@ -18,6 +18,8 @@ class AppState(Enum):
 NOTIFY_CHAR = os.getenv('CHARACTERISTIC', 0)
 SOCKET_HOST = os.getenv("SOCKET_HOST")
 SOCKET_PORT = int(os.getenv("SOCKET_PORT", '55555'))
+WEBSOCKET_HOST = os.getenv("WEBSOCKET_HOST")
+WEBSOCKET_PORT = int(os.getenv("WEBSOCKET_PORT", '80'))
 
 async def scan(timeout: float):
     print("Scanning for nearby BLE (Bluetooth Low Energy) devices...")
@@ -83,7 +85,7 @@ def parse_args():
     parser.add_argument(
         "-s", "--enable-socket",
         action="store_true",
-        help="Enable data transmission via socket hosting"
+        help="Enable data transmission via sockets"
     )
     parser.add_argument(
         "-th", '--tcp-host',
@@ -94,6 +96,21 @@ def parse_args():
         "-tp", "--tcp-port",
         type=int,
         help="Port number of the socket server"
+    )
+    parser.add_argument(
+        "-ws", "--enable-websocket",
+        action="store_true",
+        help="Enable data transmission via web sockets"
+    )
+    parser.add_argument(
+        "-wsh", "--ws-host",
+        type=str,
+        help="IP Address (host) of the web socket server"
+    )
+    parser.add_argument(
+        "-wsp", "--ws-port",
+        type=int,
+        help="Port number of the web socket server"
     )
     return parser.parse_args()
 
@@ -124,6 +141,17 @@ async def main(args):
             await socket_server.start()
         else:
             print("[Socket] Server could not initiate, host and port was not provided...")
+
+    if args.enable_websocket:
+        host = args.ws_host or WEBSOCKET_HOST
+        port = args.ws_port or WEBSOCKET_PORT
+        
+        if host and port:
+            ws_server = WebSocketServer(host, port)
+            hub.register(ws_server.sub)
+            await ws_server.start()
+        else:
+            print("[WS] Server could not initiate, host and port was not provided...")
 
     while True:
         if state == AppState.SCAN:
@@ -197,10 +225,12 @@ async def main(args):
 
         elif state == AppState.QUIT:
             logger.close()
-            if args.enable_socket and (args.tcp_host or SOCKET_HOST) and (args.tcp_port or SOCKET_PORT):
-                await socket_server.close()
             if args.enable_api and args.api_url:
                 await api_server.close()
+            if args.enable_socket and (args.tcp_host or SOCKET_HOST) and (args.tcp_port or SOCKET_PORT):
+                await socket_server.close()
+            if args.enable_websocket and (args.ws_host or WEBSOCKET_HOST) and (args.ws_port or WEBSOCKET_PORT):
+                await ws_server.close()
             print("Exiting program...")
             break
 

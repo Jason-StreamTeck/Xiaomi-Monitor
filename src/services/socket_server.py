@@ -1,10 +1,7 @@
 import json
 import asyncio
 from models import Measurement
-from dotenv import load_dotenv
 from typing import Set
-
-load_dotenv()
 
 class SocketServer:
     def __init__(self, host: str, port: int):
@@ -15,7 +12,7 @@ class SocketServer:
 
     async def start(self):
         self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
-        print(f"[Socket] Listening on {self.host}:{self.port}...")
+        # print(f"[Socket] Listening on {self.host}:{self.port}...")
         return self.server
     
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
