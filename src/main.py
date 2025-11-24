@@ -112,13 +112,18 @@ def parse_args():
         type=int,
         help="Port number of the web socket server"
     )
+    parser.add_argument(
+        "-i", "--interval",
+        type=int,
+        help="Time interval (seconds) between data transmissions (cannot be less than device minimum)"
+    )
     return parser.parse_args()
 
 async def main(args):
     state = AppState.SCAN
     address = None
     auto_connect = False
-    hub = NotificationHub()
+    hub = NotificationHub(args.interval)
 
     logger = FileLogger(args.output_file, args.file_mode, args.verbose)
     hub.register(logger.sub)
@@ -196,9 +201,15 @@ async def main(args):
                 async with BleakClient(address) as client:
                     if client.is_connected:
                         print(f"Successfully established a connection with {address}.")
-                        await client.start_notify(NOTIFY_CHAR, hub.notify)
+                        await client.start_notify(NOTIFY_CHAR, hub.handle_notify)
+                        if args.interval is not None:
+                            send_task = asyncio.create_task(hub.send_interval())
+
                         asyncio.get_event_loop().run_in_executor(None, action_input)
                         await event.wait()
+
+                        if send_task:
+                            send_task.cancel()
                         await client.stop_notify(NOTIFY_CHAR)
                         state = AppState.QUIT
 

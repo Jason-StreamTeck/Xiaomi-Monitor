@@ -35,21 +35,22 @@ python main.py -api --api-url http://localhost:6123
 python main.py -s -sh 127.0.0.1 -sp 55555
 ```
 
-| Flag   | Long Form         | Type           | Default              | Description                                                                           |
+| Flag   | Long Form            | Type           | Default            | Description                                                                           |
 | ------ | ---------------- | -------------- | ------------------ | ------------------------------------------------------------------------------------- |
-| `-t`   | `--scan-timeout`  | `float`        | `10.0`             | Duration (in seconds) for each BLE scan.                                              |
-| `-mac` | `--mac-address`   | `str`          | *None*             | Optional MAC address of the BLE device to connect directly (enables end-to-end service). |
-| `-o`   | `--output-file`   | `str`          | `"monitor_data"`   | Name of the CSV file for storing logged data.                                         |
-| `-m`   | `--file-mode`     | `"w"` or `"a"` | `"w"`              | Choose whether to **write** a new file (`w`) or **append** to an existing file (`a`). |
-| `-v`   | `--verbose`       | `bool`         | `False`            | Enable live data logging output in the terminal.                                      |
-| `-api` | `--enable-api`    | `bool`         | `False`            | Enable API server for data transmission.                                              |
-| *None* | `--api-url`       | `str`          | *None*             | IP address (host) of the API server.                                                 |
-| `-s`   | `--enable-socket` | `bool`         | `False`            | Enable Socket server for data transmission.                                           |
-| `-th`  | `--tcp-host`   | `str`          | *None*             | Host IP address of the Socket server.                                                |
-| `-tp`  | `--tcp-port`   | `int`          | *None*             | Host port number of the Socket server.                                               |
-| `-ws`       | `--enable-websocket` | `bool`         | `False`          | Enable WebSocket server for real-time data transmission.                                 |
-| `-wsh`      | `--ws-host`          | `str`          | *None*           | Host IP address of the WebSocket server.                                                 |
-| `-wsp`      | `--ws-port`          | `int`          | *None*           | Port number of the WebSocket server.                                                     |
+| `-t`   | `--scan-timeout`     | `float`        | `10.0`             | Duration (in seconds) for each BLE scan.                                  |
+| `-mac` | `--mac-address`      | `str`          | *None*             | Optional MAC address of the BLE device to connect directly (enables end-to-end service). |
+| `-o`   | `--output-file`      | `str`          | `"monitor_data"`   | Name of the CSV file for storing logged data.                                  |
+| `-m`   | `--file-mode`        | `"w"` or `"a"` | `"w"`              | Choose whether to **write** a new file (`w`) or **append** to an existing file (`a`).  |
+| `-v`   | `--verbose`          | `bool`         | `False`            | Enable live data logging output in the terminal.                              |
+| `-api` | `--enable-api`       | `bool`         | `False`            | Enable API server for data transmission.                          |
+| *None* | `--api-url`          | `str`          | *None*             | IP address (host) of the API server.                                |
+| `-s`   | `--enable-socket`    | `bool`         | `False`            | Enable Socket server for data transmission.                          |
+| `-th`  | `--tcp-host`         | `str`          | *None*             | Host IP address of the Socket server.                                |
+| `-tp`  | `--tcp-port`         | `int`          | *None*             | Host port number of the Socket server.                                |
+| `-ws`  | `--enable-websocket` | `bool`         | `False`            | Enable WebSocket server for real-time data transmission.                          |
+| `-wsh` | `--ws-host`          | `str`          | *None*             | Host IP address of the WebSocket server.                                |
+| `-wsp` | `--ws-port`          | `int`          | *None*             | Port number of the WebSocket server.                                |
+| `-i`   | `--interval`         | `int`          | *None*             | Interval (in seconds) between each data transmission (default is device minimum, ~6s).      |
 
 7) Repeatedly scan until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list of BLE devices and can be selected.
 
