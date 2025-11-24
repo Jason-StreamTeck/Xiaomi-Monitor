@@ -2,7 +2,7 @@ import asyncio
 import json
 import websockets
 
-from models import MiMeasurement
+from models import Measurement
 
 class WebSocketServer:
     def __init__(self, host: str, port: int):
@@ -28,7 +28,7 @@ class WebSocketServer:
         # print(f"[WS] Starting server on {self.host}:{self.port}")
         self.server = await websockets.serve(self.handle_client, self.host, self.port)
     
-    async def broadcast(self, data: MiMeasurement):
+    async def broadcast(self, data: Measurement):
         if not self.clients:
             return
         payload = json.dumps(data.model_dump()).encode('utf-8')
@@ -47,7 +47,7 @@ class WebSocketServer:
         )
 
     async def sub(self, ts: float, temp: float, humid: int, bat: int):
-        measurement = MiMeasurement(
+        measurement = Measurement(
             timestamp=ts,
             temperature=temp,
             humidity=humid,

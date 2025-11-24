@@ -1,22 +1,24 @@
 import csv
+from models import Measurement
 
 class FileLogger:
     def __init__(self, filename, action, verbose):
         self.file = open(filename + '.csv', action, newline="", buffering=1)
         self.writer = csv.writer(self.file)
         self.verbose = verbose
-        if action == "w":
-            self.writer.writerow(["Timestamp", "Temperature_C", "Humidity_%", "Battery_%"])
+        self.header = action != "w"
 
-    # def sub(self, timestamp, temp, humid, bat):
-    #     self.writer.writerow([timestamp, temp, humid, bat])
-    #     if (self.verbose):
-    #         print(f"[Data] Timestamp: {timestamp:18} | Temperature: {temp:3.1f}°C | Humidity: {humid:2}% | Battery: {bat:2}%")
+    def sub(self, data: Measurement):
+        if not self.header:
+            if data.type == "XIAOMI":
+                self.writer.writerow(["Timestamp_s", "Temperature_C", "Humidity_%", "Battery_%"])
+            if data.type == "O2RING":
+                self.writer.writerow(["Timestamp_s", "SpO2_%", "PulseRate_BPM"])
+            self.header = True
 
-    def sub(self, timestamp, spo2, pr):
-        self.writer.writerow([timestamp, spo2, pr])
+        self.writer.writerow([x for x in data.data])
         if (self.verbose):
-            print(f"[Data] Timestamp: {timestamp:18} | SpO2: {spo2}% | PR: {pr} NPM")
+            print(f"[Data] {data}")
     
     def close(self):
         self.file.close()

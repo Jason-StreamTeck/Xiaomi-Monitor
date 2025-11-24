@@ -5,6 +5,7 @@ import asyncio
 import inspect
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from dotenv import load_dotenv
+from models import Measurement, MiData, O2Data
 
 load_dotenv()
 
@@ -21,24 +22,41 @@ class NotificationHub:
         self.subs.append(sub)
 
     def handle_notify(self, characteristic: BleakGATTCharacteristic, data: bytearray):
-        decoded = ()
+        decoded = {}
         ts = time.time()
-        
+
         if characteristic.uuid == MI_NOTIFY_CHAR:
             temp = self._decode_temp(data)
             humid = self._decode_humid(data)
             bat = self._decode_volt(data)
-            decoded = (ts, temp, humid, bat)
+
+            decoded = Measurement(
+                type="XIAOMI",
+                data= MiData(
+                    timestamp=ts,
+                    temperature=temp,
+                    humidity=humid,
+                    battery=bat
+                )
+            )
 
         elif characteristic.uuid == O2_NOTIFY_CHAR:
             if len(data) < 3: return
             spo2 = self._decode_spo2(data)
             pr = self._decode_pr(data)
-            decoded = (ts, spo2, pr)
+            
+            decoded = Measurement(
+                type="O2RING",
+                data= O2Data(
+                    timestamp=ts,
+                    spo2=spo2,
+                    pr=pr
+                )
+            )
 
         self.latest_data = decoded
         if self.interval == None:
-            self._send_data_o2(decoded)
+            self._send_data(decoded)
 
     async def send_interval(self):
         while True:
@@ -47,21 +65,12 @@ class NotificationHub:
                 self._send_data(time.time(), temp, humid, bat)
             await asyncio.sleep(self.interval)
 
-    def _send_data(self, data):
-        (ts, temp, humid, bat) = data
+    def _send_data(self, data: Measurement):
         for sub in self.subs:
             if inspect.iscoroutinefunction(sub):
-                asyncio.create_task(sub(ts, temp, humid, bat))
+                asyncio.create_task(sub(data))
             else:
-                sub(ts, temp, humid, bat)
-    
-    def _send_data_o2(self, data):
-        (ts, spo2, pr) = data
-        for sub in self.subs:
-            if inspect.iscoroutinefunction(sub):
-                asyncio.create_task(sub(ts, spo2, pr))
-            else:
-                sub(ts, spo2, pr)
+                sub(data)
 
     # Decoding logic was obtained from the MiTemperature2 repository by JsBergbau
 
