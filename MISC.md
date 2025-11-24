@@ -3,7 +3,7 @@
 ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6 ['notify', 'read']
 
 ### Conclusion
-Use 'ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6' as the other characteristic could not access notify. (To be put into the `CHARACTERISTIC` field of the `.env` file)
+Use 'ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6' as the other characteristic could not access notify. (To be put into the `MI_CHARACTERISTIC` field of the `.env` file)
 
 ### List of Services and Characteristics provided by `Mi Temperature and Humidity Monitor 2`
 

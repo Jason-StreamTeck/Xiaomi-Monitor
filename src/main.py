@@ -15,7 +15,12 @@ class AppState(Enum):
     CONNECT = auto()
     QUIT = auto()
 
-NOTIFY_CHAR = os.getenv('CHARACTERISTIC', 0)
+MI_DEVICE_NAME = "LYWSD03MMC"
+MI_NOTIFY_CHAR = os.getenv('MI_CHARACTERISTIC', 0)
+O2_DEVICE_NAME = "O2Ring"
+O2_NOTIFY_CHAR = os.getenv('O2_NOTIFY_CHAR', 0)
+O2_WRITE_CHAR = os.getenv('O2_WRITE_CHAR', 0)
+ENABLE_REALTIME = bytes([0xAA, 0x17, 0xE8, 0x00, 0x00, 0x00, 0x00, 0x1B]) # From middleware-rust by Joe Huang
 SOCKET_HOST = os.getenv("SOCKET_HOST")
 SOCKET_PORT = int(os.getenv("SOCKET_PORT", '55555'))
 WEBSOCKET_HOST = os.getenv("WEBSOCKET_HOST")
@@ -31,7 +36,7 @@ async def scan(timeout: float):
 
     print("Devices found:")
     for i, device in enumerate(devices, start=1):
-        print(f"[{i:2}] {device.address:18} | {device.name}")
+        print(f"[{i:2}] {device.address:17}  |  {device.name}")
     return devices
 
 def parse_args():
@@ -65,6 +70,11 @@ def parse_args():
         choices=["w", "a"],
         default="w",
         help="Option to write or append to the output CSV file"
+    )
+    parser.add_argument(
+        "-i", "--interval",
+        type=int,
+        help="Time interval (seconds) between data transmissions (cannot be less than device minimum)"
     )
     parser.add_argument(
         "-v", "--verbose",
@@ -111,11 +121,6 @@ def parse_args():
         "-wsp", "--ws-port",
         type=int,
         help="Port number of the web socket server"
-    )
-    parser.add_argument(
-        "-i", "--interval",
-        type=int,
-        help="Time interval (seconds) between data transmissions (cannot be less than device minimum)"
     )
     return parser.parse_args()
 
@@ -186,11 +191,10 @@ async def main(args):
 
 
         elif state == AppState.CONNECT:
-            event = asyncio.Event()
-            def action_input():
-                action = input(f"Receiving data from {NOTIFY_CHAR}... Enter [q] to stop notification.\n")
-                if action == "q":
-                    event.set()
+            async def write_to_o2ring(client, interval=1):
+                while True:
+                    await client.write_gatt_char(O2_WRITE_CHAR, ENABLE_REALTIME)
+                    await asyncio.sleep(interval)
 
             try:
                 if not address:
@@ -201,16 +205,36 @@ async def main(args):
                 async with BleakClient(address) as client:
                     if client.is_connected:
                         print(f"Successfully established a connection with {address}.")
-                        await client.start_notify(NOTIFY_CHAR, hub.handle_notify)
+                        notify_char = 0
+                        send_task = None
+                        write_task = None
+
+                        if client.name == MI_DEVICE_NAME:
+                            notify_char = MI_NOTIFY_CHAR
+                            await client.start_notify(notify_char, hub.handle_notify)
+
+                        elif client.name.startswith(O2_DEVICE_NAME):
+                            notify_char = O2_NOTIFY_CHAR
+                            await client.start_notify(notify_char, hub.handle_notify)
+                            write_task = asyncio.create_task(write_to_o2ring(client, args.interval or 1))
+
                         if args.interval is not None:
                             send_task = asyncio.create_task(hub.send_interval())
+
+                        event = asyncio.Event()
+                        def action_input():
+                            action = input(f"Receiving data from {notify_char}... Enter [q] to stop notification.\n")
+                            if action == "q":
+                                event.set()
 
                         asyncio.get_event_loop().run_in_executor(None, action_input)
                         await event.wait()
 
                         if send_task:
                             send_task.cancel()
-                        await client.stop_notify(NOTIFY_CHAR)
+                        if client.name.startswith(O2_DEVICE_NAME):
+                            write_task.cancel()
+                        await client.stop_notify(notify_char)
                         state = AppState.QUIT
 
             except Exception as e:

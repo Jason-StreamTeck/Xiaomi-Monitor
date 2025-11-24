@@ -1,6 +1,6 @@
 import json
 import asyncio
-from models import Measurement
+from models import MiMeasurement
 from typing import Set
 
 class SocketServer:
@@ -33,7 +33,7 @@ class SocketServer:
         except Exception as e:
             print(f"[Socket] Error occurred:", e)
 
-    async def broadcast(self, data: Measurement):
+    async def broadcast(self, data: MiMeasurement):
         payload = json.dumps(data.model_dump()).encode('utf-8')
         for client in self.clients.copy():
             try:
@@ -43,7 +43,7 @@ class SocketServer:
                 self.clients.discard(client)
 
     async def sub(self, ts: float, temp: float, humid: int, bat: int):
-        measurement = Measurement(
+        measurement = MiMeasurement(
             timestamp=ts,
             temperature=temp,
             humidity=humid,

@@ -15,7 +15,7 @@ pip install -r requirements.txt
 
 4) Identify the `example.env` file in the repository and name it `.env` without extension.
 
-5) Fill in the `CHARACTERISTIC` field.
+5) Fill in the `MI_CHARACTERISTIC` field.
 
 - Optionally, fill `SOCKET_HOST` and `SOCKET_PORT` fields for Socket data transmission.
 - Optionally, fill `WEBSOCKET_HOST` and `WEBSOCKET_PORT` fields WebSocket data transmission.

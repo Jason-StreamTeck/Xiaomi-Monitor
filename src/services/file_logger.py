@@ -7,11 +7,16 @@ class FileLogger:
         self.verbose = verbose
         if action == "w":
             self.writer.writerow(["Timestamp", "Temperature_C", "Humidity_%", "Battery_%"])
-        
-    def sub(self, timestamp, temp, humid, bat):
-        self.writer.writerow([timestamp, temp, humid, bat])
+
+    # def sub(self, timestamp, temp, humid, bat):
+    #     self.writer.writerow([timestamp, temp, humid, bat])
+    #     if (self.verbose):
+    #         print(f"[Data] Timestamp: {timestamp:18} | Temperature: {temp:3.1f}°C | Humidity: {humid:2}% | Battery: {bat:2}%")
+
+    def sub(self, timestamp, spo2, pr):
+        self.writer.writerow([timestamp, spo2, pr])
         if (self.verbose):
-            print(f"[Data] Timestamp: {timestamp:18} | Temperature: {temp:3.1f}°C | Humidity: {humid:2}% | Battery: {bat:2}%")
+            print(f"[Data] Timestamp: {timestamp:18} | SpO2: {spo2}% | PR: {pr} NPM")
     
     def close(self):
         self.file.close()

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-class Measurement(BaseModel):
+class MiMeasurement(BaseModel):
     timestamp: float
     temperature: float
-    humidity: float
-    battery: float
+    humidity: int
+    battery: int

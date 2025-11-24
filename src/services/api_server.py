@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from models import Measurement
+from models import MiMeasurement
 from urllib.parse import urlparse
 import uvicorn
 import asyncio
@@ -7,8 +7,8 @@ import asyncio
 class APIServer:
     def __init__(self):
         self.app = FastAPI()
-        self.latest_data: Measurement | None = None
-        self.data_history: list[Measurement] = []
+        self.latest_data: MiMeasurement | None = None
+        self.data_history: list[MiMeasurement] = []
         
         self.app.get("/data")(self.get_latest_data)
         self.app.get("/history")(self.get_data_history)
@@ -17,7 +17,7 @@ class APIServer:
         self.task: asyncio.Task | None = None
     
     def sub(self,ts: float, temp: float, humid: int, bat: int):
-        measurement = Measurement(
+        measurement = MiMeasurement(
             timestamp=ts,
             temperature=temp,
             humidity=humid,

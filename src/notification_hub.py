@@ -1,8 +1,15 @@
 import sys
+import os
 import time
 import asyncio
 import inspect
 from bleak.backends.characteristic import BleakGATTCharacteristic
+from dotenv import load_dotenv
+
+load_dotenv()
+
+MI_NOTIFY_CHAR = os.getenv('MI_CHARACTERISTIC', 0)
+O2_NOTIFY_CHAR = os.getenv('O2_NOTIFY_CHAR', 0)
 
 class NotificationHub:
     def __init__(self, interval: int | None):
@@ -14,13 +21,24 @@ class NotificationHub:
         self.subs.append(sub)
 
     def handle_notify(self, characteristic: BleakGATTCharacteristic, data: bytearray):
+        decoded = ()
         ts = time.time()
-        temp = self._decode_temp(data)
-        humid = self._decode_humid(data)
-        bat = self._decode_volt(data)
-        self.latest_data = (ts, temp, humid, bat)
+        
+        if characteristic.uuid == MI_NOTIFY_CHAR:
+            temp = self._decode_temp(data)
+            humid = self._decode_humid(data)
+            bat = self._decode_volt(data)
+            decoded = (ts, temp, humid, bat)
+
+        elif characteristic.uuid == O2_NOTIFY_CHAR:
+            if len(data) < 3: return
+            spo2 = self._decode_spo2(data)
+            pr = self._decode_pr(data)
+            decoded = (ts, spo2, pr)
+
+        self.latest_data = decoded
         if self.interval == None:
-            self._send_data(ts, temp, humid, bat)
+            self._send_data_o2(decoded)
 
     async def send_interval(self):
         while True:
@@ -29,12 +47,21 @@ class NotificationHub:
                 self._send_data(time.time(), temp, humid, bat)
             await asyncio.sleep(self.interval)
 
-    def _send_data(self, ts, temp, humid, bat):
+    def _send_data(self, data):
+        (ts, temp, humid, bat) = data
         for sub in self.subs:
             if inspect.iscoroutinefunction(sub):
                 asyncio.create_task(sub(ts, temp, humid, bat))
             else:
                 sub(ts, temp, humid, bat)
+    
+    def _send_data_o2(self, data):
+        (ts, spo2, pr) = data
+        for sub in self.subs:
+            if inspect.iscoroutinefunction(sub):
+                asyncio.create_task(sub(ts, spo2, pr))
+            else:
+                sub(ts, spo2, pr)
 
     # Decoding logic was obtained from the MiTemperature2 repository by JsBergbau
 
@@ -47,3 +74,11 @@ class NotificationHub:
     def _decode_volt(self, data: bytearray):
         voltage =  int.from_bytes(data[3:5],byteorder=sys.byteorder) / 1000
         return  min(int(round((voltage - 2.1),2) * 100), 100)
+    
+    # Decoding logic was obtained from the middlware-rust repository by Joe Huang
+
+    def _decode_spo2(self, data: bytearray):
+        return data[7]
+
+    def _decode_pr(self, data:bytearray):
+        return int.from_bytes(data[8:10], byteorder=sys.byteorder)
