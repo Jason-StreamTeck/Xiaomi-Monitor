@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Union
 
 class Measurement(BaseModel):
-    type: str
+    source: str
     data: Union["MiData", "O2Data"]
 
 class MiData(BaseModel):

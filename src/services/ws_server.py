@@ -2,7 +2,7 @@ import asyncio
 import json
 import websockets
 
-from models import Measurement
+from core.models import Measurement
 
 class WebSocketServer:
     def __init__(self, host: str, port: int, verbose: bool):

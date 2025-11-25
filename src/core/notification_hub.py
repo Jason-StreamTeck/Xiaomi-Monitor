@@ -5,7 +5,7 @@ import asyncio
 import inspect
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from dotenv import load_dotenv
-from models import Measurement, MiData, O2Data
+from core.models import Measurement, MiData, O2Data
 
 load_dotenv()
 
@@ -31,7 +31,7 @@ class NotificationHub:
             bat = self._decode_volt(data)
 
             decoded = Measurement(
-                type="XIAOMI",
+                source="XIAOMI",
                 data= MiData(
                     timestamp=ts,
                     temperature=temp,
@@ -46,7 +46,7 @@ class NotificationHub:
             pr = self._decode_pr(data)
             
             decoded = Measurement(
-                type="O2RING",
+                source="O2RING",
                 data= O2Data(
                     timestamp=ts,
                     spo2=spo2,

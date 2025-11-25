@@ -5,7 +5,7 @@ from bleak import BleakClient
 from bleak import BleakScanner
 from enum import Enum, auto
 from services import APIServer, SocketServer, WebSocketServer, FileLogger
-from notification_hub import NotificationHub
+from core import NotificationHub, SensorPipeline
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -40,88 +40,28 @@ async def scan(timeout: float):
     return devices
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        prog="Monitor",
-        description="Xiaomi Temperature and Humidity Monitor 2",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
+    parser = argparse.ArgumentParser(prog="Monitor", description="Xiaomi Temperature and Humidity Monitor 2", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
     # BLE Options
-    parser.add_argument(
-        "-t", "--scan-timeout",
-        type=float,
-        default=10.0,
-        help="Duration (seconds) of each scan to find BLE devices"
-    )
-    parser.add_argument(
-        "-mac", "--mac-address",
-        type=str,
-        help="The MAC Address of the BLE device to connect to (enables end-to-end service)"
-    )
+    parser.add_argument("-t", "--scan-timeout", type=float, default=10.0, help="Duration (seconds) of each scan to find BLE devices")
+    parser.add_argument("-mac", "--mac-address", type=str, help="The MAC Address of the BLE device to connect to (enables end-to-end service)")
+    
     # Logging options
-    parser.add_argument(
-        "-o", "--output-file",
-        type=str,
-        default="monitor_data",
-        help="The name of the CSV file to output data into"
-    )
-    parser.add_argument(
-        "-m", "--file-mode",
-        type=str,
-        choices=["w", "a"],
-        default="w",
-        help="Option to write or append to the output CSV file"
-    )
-    parser.add_argument(
-        "-i", "--interval",
-        type=int,
-        help="Time interval (seconds) between data transmissions (cannot be less than device minimum)"
-    )
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable visual logging of data in the terminal"
-    )
+    parser.add_argument("-o", "--output-file", type=str, default="monitor_data", help="The name of the CSV file to output data into")
+    parser.add_argument("-m", "--file-mode", type=str, choices=["w", "a"], default="w", help="Option to write or append to the output CSV file")
+    parser.add_argument("-i", "--interval", type=int, help="Time interval (seconds) between data transmissions (cannot be less than device minimum)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable visual logging of data in the terminal")
+    
     # Data transmission service options
-    parser.add_argument(
-        "-api", "--enable-api",
-        action="store_true",
-        help="Enable data transmission via API server hosting"
-    )
-    parser.add_argument(
-        '--api-url',
-        type=str,
-        help="IP address (host) of the API server "
-    )
-    parser.add_argument(
-        "-s", "--enable-socket",
-        action="store_true",
-        help="Enable data transmission via sockets"
-    )
-    parser.add_argument(
-        "-th", '--tcp-host',
-        type=str,
-        help="IP Address (host) of the socket server"
-    )
-    parser.add_argument(
-        "-tp", "--tcp-port",
-        type=int,
-        help="Port number of the socket server"
-    )
-    parser.add_argument(
-        "-ws", "--enable-websocket",
-        action="store_true",
-        help="Enable data transmission via web sockets"
-    )
-    parser.add_argument(
-        "-wsh", "--ws-host",
-        type=str,
-        help="IP Address (host) of the web socket server"
-    )
-    parser.add_argument(
-        "-wsp", "--ws-port",
-        type=int,
-        help="Port number of the web socket server"
-    )
+    parser.add_argument("-api", "--enable-api", action="store_true", help="Enable data transmission via API server hosting")
+    parser.add_argument('--api-url', type=str, help="IP address (host) of the API server ")
+    parser.add_argument("-s", "--enable-socket", action="store_true", help="Enable data transmission via sockets")
+    parser.add_argument("-th", '--tcp-host', type=str, help="IP Address (host) of the socket server")
+    parser.add_argument("-tp", "--tcp-port", type=int, help="Port number of the socket server")
+    parser.add_argument("-ws", "--enable-websocket", action="store_true", help="Enable data transmission via web sockets")
+    parser.add_argument("-wsh", "--ws-host", type=str, help="IP Address (host) of the web socket server")
+    parser.add_argument("-wsp", "--ws-port", type=int, help="Port number of the web socket server")
+
     return parser.parse_args()
 
 async def main(args):
@@ -129,6 +69,8 @@ async def main(args):
     address = None
     auto_connect = False
     hub = NotificationHub(args.interval)
+
+    pipeline = SensorPipeline(args.interval)
 
     logger = FileLogger(args.output_file, args.file_mode, args.verbose)
     hub.register(logger.sub)
@@ -170,24 +112,34 @@ async def main(args):
                 state = AppState.CONNECT
                 continue
 
-            devices = await scan(args.scan_timeout)
+            print("\nScanning for nearby BLE (Bluetooth Low Energy) devices...")
+            devices = await pipeline.scan(args.scan_timeout)
+            if not devices:
+                print("No devices found. Please try moving the device closer and rescan.")
+                state = AppState.SCAN
+                continue
+
+            print("Devices found:")
+            for i, device in enumerate(devices, start=1):
+                print(f"[{i:2}]  {device.address:17}  |  {device.name}")
+                if i >= 20: break
 
             action = input(f"\nPlease enter your next course of action.\n1) A device number [1-{len(devices)}]\n2) [r] to rescan\n3) [q] to quit\nInput: ").strip().lower()
             if action == "r":
-                continue
+                state = AppState.SCAN
             elif action == "q":
                 state = AppState.QUIT
             elif action.isdigit():
                 index = int(action) - 1
-                if 0 <= index < len(devices):
+                if 0 <= index < min(len(devices), 20):
                     device = devices[index]
                     address = device.address
                     print(f"Selected device: {device.name or 'Unknown'} ({device.address})")
                     state = AppState.CONNECT
                 else:
-                    print("Invalid device selection, please try again.")
+                    print("Invalid device selection, please try again after rescan.")
             else:
-                print("Invalid input, please try again.")
+                print("Invalid input, rescanning...")
 
 
         elif state == AppState.CONNECT:

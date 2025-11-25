@@ -1,5 +1,5 @@
 import csv
-from models import Measurement
+from core.models import Measurement
 
 class FileLogger:
     def __init__(self, filename, action, verbose):
@@ -10,9 +10,9 @@ class FileLogger:
 
     def sub(self, data: Measurement):
         if not self.header:
-            if data.type == "XIAOMI":
+            if data.source == "XIAOMI":
                 self.writer.writerow(["Timestamp_s", "Temperature_C", "Humidity_%", "Battery_%"])
-            if data.type == "O2RING":
+            if data.source == "O2RING":
                 self.writer.writerow(["Timestamp_s", "SpO2_%", "PulseRate_BPM"])
             self.header = True
 
