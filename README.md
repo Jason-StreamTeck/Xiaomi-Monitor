@@ -23,16 +23,16 @@ pip install -r requirements.txt
 6) Run the service
 ```bash
 cd src
-python main.py
+python cli.py
 
 # Example usage
-python main.py -t 5 -o data -v
+python cli.py -t 5 -o data -v
 
 # Example usage for API options
-python main.py -api --api-url http://localhost:6123
+python cli.py -api --api-url http://localhost:6123
 
 # Example usage for Socket options
-python main.py -s -sh 127.0.0.1 -sp 55555
+python cli.py -s -sh 127.0.0.1 -sp 55555
 ```
 
 | Flag   | Long Form            | Type           | Default            | Description                                                                           |
