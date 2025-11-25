@@ -4,20 +4,22 @@ from models import Measurement
 from typing import Set
 
 class SocketServer:
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, verbose: bool):
         self.host = host
         self.port = port
         self.clients: Set[asyncio.StreamWriter] = set()
         self.server: asyncio.Server | None = None
+        self.verbose = verbose
 
     async def start(self):
-        self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
         # print(f"[Socket] Listening on {self.host}:{self.port}...")
+        self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
         return self.server
     
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         address = writer.get_extra_info("peername")
-        print(f"[Socket] Client {address} connected.")
+        if self.verbose:
+            print(f"[Socket] Client {address} connected.")
         self.clients.add(writer)
 
         try:
@@ -25,10 +27,9 @@ class SocketServer:
                 data = await reader.read(1024)
                 if not data:
                     break
-        except asyncio.CancelledError:
-            pass
-        except (ConnectionResetError, OSError):
-            print(f"[Socket] Client {address} disconnected.")
+        except (asyncio.CancelledError, ConnectionResetError, OSError):
+            if self.verbose:
+                print(f"[Socket] Client {address} disconnected.")
             pass
         except Exception as e:
             print(f"[Socket] Error occurred:", e)
@@ -42,14 +43,8 @@ class SocketServer:
             except Exception:
                 self.clients.discard(client)
 
-    async def sub(self, ts: float, temp: float, humid: int, bat: int):
-        measurement = Measurement(
-            timestamp=ts,
-            temperature=temp,
-            humidity=humid,
-            battery=bat
-        )
-        await self.broadcast(measurement)
+    async def sub(self, data: Measurement):
+        await self.broadcast(data)
 
     async def close(self):
         for client in self.clients:

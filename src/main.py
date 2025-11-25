@@ -146,7 +146,7 @@ async def main(args):
         port = args.tcp_port or SOCKET_PORT
         
         if host and port:
-            socket_server = SocketServer(host, port)
+            socket_server = SocketServer(host, port, args.verbose)
             hub.register(socket_server.sub)
             await socket_server.start()
         else:
@@ -157,7 +157,7 @@ async def main(args):
         port = args.ws_port or WEBSOCKET_PORT
         
         if host and port:
-            ws_server = WebSocketServer(host, port)
+            ws_server = WebSocketServer(host, port, args.verbose)
             hub.register(ws_server.sub)
             await ws_server.start()
         else:

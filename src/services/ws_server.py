@@ -5,15 +5,17 @@ import websockets
 from models import Measurement
 
 class WebSocketServer:
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, verbose: bool):
         self.host = host
         self.port = port
+        self.verbose = verbose
         self.clients = set()
         self.server = None
 
     async def handle_client(self, websocket: websockets.ServerConnection):
         self.clients.add(websocket)
-        print(f"[WS] Client {websocket.remote_address} connected.")
+        if self.verbose:
+            print(f"[WS] Client {websocket.remote_address} connected.")
 
         try:
             async for _ in websocket:
@@ -22,7 +24,8 @@ class WebSocketServer:
             print(f"Error occured:", e)
         finally:
             self.clients.remove(websocket)
-            print(f"[WS] Client {websocket.remote_address} disconnected.")
+            if self.verbose:
+                print(f"[WS] Client {websocket.remote_address} disconnected.")
 
     async def start(self):
         # print(f"[WS] Starting server on {self.host}:{self.port}")
@@ -46,14 +49,8 @@ class WebSocketServer:
             return_exceptions=True
         )
 
-    async def sub(self, ts: float, temp: float, humid: int, bat: int):
-        measurement = Measurement(
-            timestamp=ts,
-            temperature=temp,
-            humidity=humid,
-            battery=bat
-        )
-        await self.broadcast(measurement)
+    async def sub(self, data: Measurement):
+        await self.broadcast(data)
 
     async def close(self):
         for client in list(self.clients):

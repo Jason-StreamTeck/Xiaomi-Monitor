@@ -16,15 +16,9 @@ class APIServer:
         self.server: uvicorn.Server | None = None
         self.task: asyncio.Task | None = None
     
-    def sub(self,ts: float, temp: float, humid: int, bat: int):
-        measurement = Measurement(
-            timestamp=ts,
-            temperature=temp,
-            humidity=humid,
-            battery=bat
-        )
-        self.latest_data = measurement
-        self.data_history.append(measurement)
+    def sub(self, data: Measurement):
+        self.latest_data = data
+        self.data_history.append(data)
     
     def get_latest_data(self):
         return self.latest_data

@@ -34,7 +34,7 @@ class SocketClient:
                 self.callback(data)
             except Exception as e:
                 print(f"Error occurred:", e)
-    
+
     def close(self):
         self.running = False
         if self.sock:
@@ -50,7 +50,7 @@ async def main():
     try:
         await asyncio.Event().wait()
     finally:
-        await client.close()
+        client.close()
 
 if __name__ == "__main__":
     try:
