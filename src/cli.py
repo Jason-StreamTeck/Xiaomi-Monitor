@@ -1,8 +1,6 @@
 import os
 import argparse
 import asyncio
-from bleak import BleakClient
-from bleak import BleakScanner
 from enum import Enum, auto
 from services import APIServer, SocketServer, WebSocketServer, FileLogger
 from core import NotificationHub, SensorPipeline
@@ -25,19 +23,6 @@ SOCKET_HOST = os.getenv("SOCKET_HOST")
 SOCKET_PORT = int(os.getenv("SOCKET_PORT", '55555'))
 WEBSOCKET_HOST = os.getenv("WEBSOCKET_HOST")
 WEBSOCKET_PORT = int(os.getenv("WEBSOCKET_PORT", '80'))
-
-async def scan(timeout: float):
-    print("Scanning for nearby BLE (Bluetooth Low Energy) devices...")
-    devices = await BleakScanner.discover(timeout=timeout)
-
-    if not devices:
-        print("No devices found. Please try moving the device closer and rescan.")
-        return []
-
-    print("Devices found:")
-    for i, device in enumerate(devices, start=1):
-        print(f"[{i:2}] {device.address:17}  |  {device.name}")
-    return devices
 
 def parse_args():
     parser = argparse.ArgumentParser(prog="Monitor", description="Xiaomi Temperature and Humidity Monitor 2", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -66,13 +51,13 @@ def parse_args():
 
 async def main(args):
     state = AppState.SCAN
-    address = None
-    auto_connect = False
+    auto_connect = bool(args.mac_address)
     hub = NotificationHub(args.interval)
 
     pipeline = SensorPipeline(args.interval)
 
     logger = FileLogger(args.output_file, args.file_mode, args.verbose)
+    pipeline.register(logger.sub)
     hub.register(logger.sub)
 
     if args.enable_api:
@@ -105,10 +90,11 @@ async def main(args):
         else:
             print("[WS] Server could not initiate, host and port was not provided...")
 
+
     while True:
         if state == AppState.SCAN:
             if (args.mac_address):
-                address = args.mac_address
+                pipeline.address = args.mac_address
                 state = AppState.CONNECT
                 continue
 
@@ -124,7 +110,7 @@ async def main(args):
                 print(f"[{i:2}]  {device.address:17}  |  {device.name}")
                 if i >= 20: break
 
-            action = input(f"\nPlease enter your next course of action.\n1) A device number [1-{len(devices)}]\n2) [r] to rescan\n3) [q] to quit\nInput: ").strip().lower()
+            action = input(f"\nPlease enter your next course of action.\n1) A device number [1-{min(len(devices), 20)}]\n2) [r] to rescan\n3) [q] to quit\nInput: ").strip().lower()
             if action == "r":
                 state = AppState.SCAN
             elif action == "q":
@@ -133,7 +119,7 @@ async def main(args):
                 index = int(action) - 1
                 if 0 <= index < min(len(devices), 20):
                     device = devices[index]
-                    address = device.address
+                    pipeline.address = device.address
                     print(f"Selected device: {device.name or 'Unknown'} ({device.address})")
                     state = AppState.CONNECT
                 else:
@@ -143,55 +129,14 @@ async def main(args):
 
 
         elif state == AppState.CONNECT:
-            async def write_to_o2ring(client, interval=1):
-                while True:
-                    await client.write_gatt_char(O2_WRITE_CHAR, ENABLE_REALTIME)
-                    await asyncio.sleep(interval)
-
             try:
-                if not address:
-                    print("A device MAC Address has not been provided...")
-                    state = AppState.SCAN
-                    continue
                 print(f"Attempting to connect with device...")
-                async with BleakClient(address) as client:
-                    if client.is_connected:
-                        print(f"Successfully established a connection with {address}.")
-                        notify_char = 0
-                        send_task = None
-                        write_task = None
-
-                        if client.name == MI_DEVICE_NAME:
-                            notify_char = MI_NOTIFY_CHAR
-                            await client.start_notify(notify_char, hub.handle_notify)
-
-                        elif client.name.startswith(O2_DEVICE_NAME):
-                            notify_char = O2_NOTIFY_CHAR
-                            await client.start_notify(notify_char, hub.handle_notify)
-                            write_task = asyncio.create_task(write_to_o2ring(client, args.interval or 1))
-
-                        if args.interval is not None:
-                            send_task = asyncio.create_task(hub.send_interval())
-
-                        event = asyncio.Event()
-                        def action_input():
-                            action = input(f"Receiving data from {notify_char}... Enter [q] to stop notification.\n")
-                            if action == "q":
-                                event.set()
-
-                        asyncio.get_event_loop().run_in_executor(None, action_input)
-                        await event.wait()
-
-                        if send_task:
-                            send_task.cancel()
-                        if client.name.startswith(O2_DEVICE_NAME):
-                            write_task.cancel()
-                        await client.stop_notify(notify_char)
-                        state = AppState.QUIT
+                await asyncio.create_task(pipeline.connect())
+                state = AppState.QUIT
 
             except Exception as e:
                 print(f"Error occurred: {e}")
-                if auto_connect or args.mac_address:
+                if auto_connect:
                     print()
                     continue
 
@@ -210,6 +155,7 @@ async def main(args):
                 else:
                     print("Invalid input, please try again.")
 
+
         elif state == AppState.QUIT:
             logger.close()
             if args.enable_api and args.api_url:
@@ -220,6 +166,7 @@ async def main(args):
                 await ws_server.close()
             print("Exiting program...")
             break
+
 
 if __name__ == "__main__":
     args = parse_args()
