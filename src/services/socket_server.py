@@ -1,6 +1,6 @@
 import json
 import asyncio
-from core.models import Measurement
+from core import Measurement
 from typing import Set
 
 class SocketServer:

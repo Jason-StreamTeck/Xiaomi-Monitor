@@ -36,12 +36,11 @@ class SensorPipeline:
         devices = await BleakScanner.discover(timeout=timeout)
         return devices
     
-    async def connect(self, address):
-        if not address:
+    async def connect(self, address = None):
+        if not address and not self.address:
             raise SensorPipelineError("BLE device MAC Address was not provided.")
         
-        # try:
-        async with BleakClient(address = None) as client:
+        async with BleakClient(address or self.address) as client:
             if not client.is_connected:
                 raise RuntimeError(f"Failed to connect to {address or self.address}.")
             

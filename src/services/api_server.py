@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from core.models import Measurement
+from core import Measurement
 from urllib.parse import urlparse
 import uvicorn
 import asyncio

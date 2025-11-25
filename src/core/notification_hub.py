@@ -5,7 +5,7 @@ import asyncio
 import inspect
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from dotenv import load_dotenv
-from core.models import Measurement, MiData, O2Data
+from core import Measurement, MiData, O2Data
 
 load_dotenv()
 

@@ -1,5 +1,5 @@
 import csv
-from core.models import Measurement
+from core import Measurement
 
 class FileLogger:
     def __init__(self, filename, action, verbose):

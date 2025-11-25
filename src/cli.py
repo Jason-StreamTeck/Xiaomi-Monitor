@@ -52,18 +52,16 @@ def parse_args():
 async def main(args):
     state = AppState.SCAN
     auto_connect = bool(args.mac_address)
-    hub = NotificationHub(args.interval)
 
     pipeline = SensorPipeline(args.interval)
 
     logger = FileLogger(args.output_file, args.file_mode, args.verbose)
     pipeline.register(logger.sub)
-    hub.register(logger.sub)
 
     if args.enable_api:
         if args.api_url:
             api_server = APIServer();
-            hub.register(api_server.sub)
+            pipeline.register(api_server.sub)
             await api_server.start(args.api_url)
         else:
             print("[API] Server could not initiate, url was not provided...")
@@ -74,7 +72,7 @@ async def main(args):
         
         if host and port:
             socket_server = SocketServer(host, port, args.verbose)
-            hub.register(socket_server.sub)
+            pipeline.register(socket_server.sub)
             await socket_server.start()
         else:
             print("[Socket] Server could not initiate, host and port was not provided...")
@@ -85,7 +83,7 @@ async def main(args):
         
         if host and port:
             ws_server = WebSocketServer(host, port, args.verbose)
-            hub.register(ws_server.sub)
+            pipeline.register(ws_server.sub)
             await ws_server.start()
         else:
             print("[WS] Server could not initiate, host and port was not provided...")
