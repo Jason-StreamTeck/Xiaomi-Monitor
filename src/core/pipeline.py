@@ -24,27 +24,25 @@ class SensorPipeline:
         self.client = None
         self.interval = interval
         self.address = None
+        self._stop_event = asyncio.Event()
         # Only for O2Ring device
         self.send_task = None
         self.write_task = None
-
-        self._stop_event = asyncio.Event()
-        self._connect_success = False
-        self._connect_event = asyncio.Event()
 
     async def scan(self, timeout: float = 10.0):
         devices = await BleakScanner.discover(timeout=timeout)
         return devices
     
     async def connect(self, address = None):
-        if not address and not self.address:
+        if address: self.address = address
+        if not self.address:
             raise SensorPipelineError("BLE device MAC Address was not provided.")
         
-        async with BleakClient(address or self.address) as client:
+        async with BleakClient(self.address) as client:
             if not client.is_connected:
-                raise RuntimeError(f"Failed to connect to {address or self.address}.")
+                raise RuntimeError(f"Failed to connect to {self.address}.")
             
-            print(f"Successfully established a connection with {address or self.address}.")
+            print(f"Successfully established a connection with {self.address}.")
 
             notify_char = self._get_notify_char(client)
             await client.start_notify(notify_char, self.hub.handle_notify)
@@ -55,14 +53,13 @@ class SensorPipeline:
             if self.interval:
                 self.send_task = asyncio.create_task(self.hub.send_interval())
 
-            event = asyncio.Event()
             def action_input():
                 action = input(f"Receiving data from {notify_char}... Enter [q] to stop notification.\n")
                 if action == "q":
-                    event.set()
+                    self.close()
 
             asyncio.get_event_loop().run_in_executor(None, action_input)
-            await event.wait()
+            await self._stop_event.wait()
 
             if self.send_task:
                 self.send_task.cancel()

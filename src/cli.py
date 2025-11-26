@@ -3,7 +3,7 @@ import argparse
 import asyncio
 from enum import Enum, auto
 from services import APIServer, SocketServer, WebSocketServer, FileLogger
-from core import NotificationHub, SensorPipeline
+from core import SensorPipeline
 from dotenv import load_dotenv
 
 load_dotenv()
