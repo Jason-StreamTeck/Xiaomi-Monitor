@@ -3,7 +3,7 @@ import asyncio
 import qasync
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtGui import QIcon, QFont
+from PySide6.QtGui import QIcon, QFont, QPalette, QColor, QMovie
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QApplication, QWidget, QTabWidget, QPushButton, QHBoxLayout, QVBoxLayout, QInputDialog, QLabel, QSpinBox, QFrame, QListWidget)
 
@@ -16,20 +16,23 @@ class UiSignals(QObject):
     devices = Signal(list)
 
 class DeviceTab(QWidget):
-    def __init__(self, pipeline: SensorPipeline, signals: UiSignals, parent=None):
+    def __init__(self, pipeline: SensorPipeline, parent=None):
         super().__init__(parent)
         self.pipeline = pipeline
-        self.signals = signals
+        self.signals = UiSignals()
 
         # Left Section
-        self.scan_button = QPushButton("scan")
+        self.scan_button = QPushButton("Scan for Devices")
+        self.scan_button.setMinimumHeight(40)
         self.scan_timeout_spin = QSpinBox()
         self.scan_timeout_spin.setRange(1, 60)
         self.scan_timeout_spin.setValue(10)
 
+        # https://icons8.com/icon/6POIOo0Oa76N/spinner icon by https://icons8.com
+        self.spinner = QMovie("../static/loading.gif")
+
         self.devices = QListWidget()
-        list_font = QFont("courier new", weight=500)
-        self.devices.setFont(list_font)
+        self.devices.setFont(QFont("Courier New", weight=500))
 
         timeout_control = QHBoxLayout()
         timeout_control.addWidget(QLabel("Timeout Duration (s)"))
@@ -41,23 +44,40 @@ class DeviceTab(QWidget):
 
         left_layout = QVBoxLayout()
         left_layout.setAlignment(Qt.AlignTop)
-        left_label = QLabel("Device Scanner")
+        left_label = QLabel("Device Scanning")
         left_layout.addWidget(left_label)
         left_layout.addWidget(self.devices)
         left_layout.addLayout(scanner_controls)
 
+        self.update_gray_out()
+
         # Middle Section
-        self.status_label = QLabel("Idle")
+        device_label = QLabel("Selected Device:")
+        self.current_device = QLabel("None")
+        self.connect_button = QPushButton("Connect")
+        self.connect_button.setMinimumHeight(40)
+        self.stop_button = QPushButton("Stop")
+        self.stop_button.setMinimumHeight(40)
+
+        device_display = QHBoxLayout()
+        device_display.addWidget(device_label)
+        device_display.addWidget(self.current_device)
+
+        connection_controls = QHBoxLayout()
+        connection_controls.addWidget(self.connect_button)
+        connection_controls.addWidget(self.stop_button)
 
         mid_layout = QVBoxLayout()
         mid_layout.setAlignment(Qt.AlignTop)
         mid_label = QLabel("Device Connection")
         mid_layout.addWidget(mid_label)
+        mid_layout.addLayout(device_display)
+        mid_layout.addLayout(connection_controls)
 
         # Right Section
         right_layout = QVBoxLayout()
         right_layout.setAlignment(Qt.AlignTop)
-        right_label = QLabel("Data")
+        right_label = QLabel("Data Capture")
         right_layout.addWidget(right_label)
 
         # Main
@@ -79,7 +99,7 @@ class DeviceTab(QWidget):
         divider2.setLineWidth(1)
 
         main_layout = QHBoxLayout()
-        main_layout.setSpacing(15)
+        main_layout.setSpacing(10)
         main_layout.addLayout(left_layout, 1)
         main_layout.addWidget(divider)
         main_layout.addLayout(mid_layout, 1)
@@ -93,20 +113,48 @@ class DeviceTab(QWidget):
 
     @qasync.asyncSlot()
     async def on_scan_clicked(self):
+        self.scan_button.setEnabled(False)
+        self.scan_button.setText("")
+        self.scan_button.setIcon(QIcon())
+        _original_style = self.scan_button.styleSheet()
+        self.scan_button.setStyleSheet("border: none; background: transparent;")
+        
+        overlay = QLabel(self.scan_button)
+        overlay.setMovie(self.spinner)
+        overlay.setAlignment(Qt.AlignCenter)
+        overlay.setGeometry(self.scan_button.rect())
+        overlay.show()
+        self.spinner.start()
+
         timeout = self.scan_timeout_spin.value()
-        self.status_label.setText("Scanning...")
         try:
             devices = await self.pipeline.scan(timeout)
             devices_dict = [{"name": device.name or "Unknown", "address": device.address} for device in devices]
             self.signals.devices.emit(devices_dict)
-            self.status_label.setText(f"Found {len(devices_dict)} Devices")
         except Exception as e:
-            self.status_label.setText(f"Scan failed: {e}")
-            
+            print(f"Scan failed: {e}")
+        finally:
+            self.spinner.stop()
+            overlay.hide()
+            self.scan_button.setText("Scan for Devices")
+            self.scan_button.setEnabled(True)
+            self.scan_button.setStyleSheet(_original_style)
+
     def on_devices(self, devices):
         self.devices.clear()
         for device in devices:
             self.devices.addItem(f"{device['address']:17} | {device['name']}")
+        self.update_gray_out()
+    
+    def update_gray_out(self):
+        palette = self.devices.palette()
+        if self.devices.count() == 0:
+            palette.setColor(QPalette.Base, QColor("#f0f0f0"))
+            palette.setColor(QPalette.Text, QColor("#a0a0a0"))
+        else:
+            palette.setColor(QPalette.Base, QColor("white"))
+            palette.setColor(QPalette.Text, QColor("black"))
+        self.devices.setPalette(palette)
         
 
 class MainWindow(QWidget):
@@ -115,7 +163,6 @@ class MainWindow(QWidget):
         self.setWindowTitle("BLE Sensor Monitoring GUI")
         self.setWindowIcon(QIcon("../static/bluetooth.svg"))
         self.setMinimumSize(960, 640)
-        self.signals = UiSignals()
 
         self.tab_widget = QTabWidget()
         self.add_tab_button = QPushButton("+")
@@ -138,7 +185,7 @@ class MainWindow(QWidget):
         logger = FileLogger("monitor_data", "w")
         pipeline.register(logger.sub)
 
-        device_tab = DeviceTab(pipeline, self.signals)
+        device_tab = DeviceTab(pipeline)
         index = self.tab_widget.addTab(device_tab, f"Device {len(self.tabs) + 1}")
         self.tab_widget.setCurrentIndex(index)
         self.tabs.append(device_tab)
