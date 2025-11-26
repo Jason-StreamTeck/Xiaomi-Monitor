@@ -2,10 +2,9 @@ import csv
 from core import Measurement
 
 class FileLogger:
-    def __init__(self, filename, action, verbose):
+    def __init__(self, filename, action):
         self.file = open(filename + '.csv', action, newline="", buffering=1)
         self.writer = csv.writer(self.file)
-        self.verbose = verbose
         self.header = action != "w"
 
     def sub(self, data: Measurement):
@@ -17,8 +16,6 @@ class FileLogger:
             self.header = True
 
         self.writer.writerow([x for x in data.data])
-        if (self.verbose):
-            print(f"[Data] {data}")
     
     def close(self):
         self.file.close()

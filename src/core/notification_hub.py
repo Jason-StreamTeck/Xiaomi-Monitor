@@ -13,9 +13,10 @@ MI_NOTIFY_CHAR = os.getenv('MI_CHARACTERISTIC', 0)
 O2_NOTIFY_CHAR = os.getenv('O2_NOTIFY_CHAR', 0)
 
 class NotificationHub:
-    def __init__(self, interval: int | None):
+    def __init__(self, interval: int | None, verbose: bool):
         self.subs = []
         self.interval = interval
+        self.verbose = verbose
         self.latest_data = None
 
     def register(self, sub):
@@ -66,6 +67,8 @@ class NotificationHub:
             await asyncio.sleep(self.interval)
 
     def _send_data(self, data: Measurement):
+        if (self.verbose):
+            print(f"[Data] {data}")
         for sub in self.subs:
             if inspect.iscoroutinefunction(sub):
                 asyncio.create_task(sub(data))

@@ -19,8 +19,8 @@ class SensorPipelineError(Exception):
     pass
 
 class SensorPipeline:
-    def __init__(self, interval: int = None):
-        self.hub = NotificationHub(interval)
+    def __init__(self, interval: int  | None = None, verbose: bool = False):
+        self.hub = NotificationHub(interval, verbose)
         self.client = None
         self.interval = interval
         self.address = None

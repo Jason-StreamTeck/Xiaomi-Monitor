@@ -53,9 +53,9 @@ async def main(args):
     state = AppState.SCAN
     auto_connect = bool(args.mac_address)
 
-    pipeline = SensorPipeline(args.interval)
+    pipeline = SensorPipeline(args.interval, args.verbose)
 
-    logger = FileLogger(args.output_file, args.file_mode, args.verbose)
+    logger = FileLogger(args.output_file, args.file_mode)
     pipeline.register(logger.sub)
 
     if args.enable_api:
