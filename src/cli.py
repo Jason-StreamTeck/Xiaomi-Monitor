@@ -130,6 +130,17 @@ async def main(args):
             try:
                 print(f"Attempting to connect with device...")
                 await asyncio.create_task(pipeline.connect())
+
+                loop = asyncio.get_event_loop()
+                event = asyncio.Event()
+                def action_input():
+                    action = input(f"Receiving data... Enter [q] to stop notification.\n")
+                    if action == "q":
+                        loop.call_soon_threadsafe(event.set)
+                loop.run_in_executor(None, action_input)
+                
+                await event.wait()
+                await pipeline.close()
                 state = AppState.QUIT
 
             except Exception as e:

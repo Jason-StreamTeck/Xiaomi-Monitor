@@ -34,38 +34,27 @@ class SensorPipeline:
         return devices
     
     async def connect(self, address = None):
-        if address: self.address = address
+        if address:
+            self.address = address
         if not self.address:
             raise SensorPipelineError("BLE device MAC Address was not provided.")
         
-        async with BleakClient(self.address) as client:
-            if not client.is_connected:
-                raise RuntimeError(f"Failed to connect to {self.address}.")
-            
-            print(f"Successfully established a connection with {self.address}.")
+        self.client = BleakClient(self.address)
+        await self.client.connect()
+        if not self.client.is_connected:
+            raise RuntimeError(f"Failed to connect to {self.address}.")
 
-            notify_char = self._get_notify_char(client)
-            await client.start_notify(notify_char, self.hub.handle_notify)
+        print(f"Successfully established a connection with {self.address}.")
 
-            if client.name.startswith(O2_DEVICE_NAME):
-                self.write_task = asyncio.create_task(self._write_to_o2ring(client))
+        notify_char = self._get_notify_char(self.client)
+        await self.client.start_notify(notify_char, self.hub.handle_notify)
 
-            if self.interval:
-                self.send_task = asyncio.create_task(self.hub.send_interval())
+        if self.client.name.startswith(O2_DEVICE_NAME):
+            self.write_task = asyncio.create_task(self._write_to_o2ring(self.client))
 
-            def action_input():
-                action = input(f"Receiving data from {notify_char}... Enter [q] to stop notification.\n")
-                if action == "q":
-                    self.close()
-
-            asyncio.get_event_loop().run_in_executor(None, action_input)
-            await self._stop_event.wait()
-
-            if self.send_task:
-                self.send_task.cancel()
-            if self.write_task:
-                self.write_task.cancel()
-            await client.stop_notify(notify_char)
+        if self.interval:
+            self.send_task = asyncio.create_task(self.hub.send_interval())
+        return
 
     def _get_notify_char(self, client):
         if client.name == MI_DEVICE_NAME:
@@ -83,5 +72,13 @@ class SensorPipeline:
     def register(self, sub):
         self.hub.register(sub)
 
-    def close(self):
-        self._stop_event.set()
+    async def close(self):
+        if self.send_task:
+            self.send_task.cancel()
+        if self.write_task:
+            self.write_task.cancel()
+
+        if self.client and self.client.is_connected:
+            notify_char = self._get_notify_char(self.client)
+            await self.client.stop_notify(notify_char)
+            await self.client.disconnect()

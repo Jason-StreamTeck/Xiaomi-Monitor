@@ -5,7 +5,7 @@ import qasync
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QPalette, QColor, QMovie
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QApplication, QWidget, QTabWidget, QPushButton, QHBoxLayout, QVBoxLayout, QInputDialog, QLabel, QSpinBox, QFrame, QListWidget)
+from PySide6.QtWidgets import (QApplication, QWidget, QTabWidget, QPushButton, QHBoxLayout, QVBoxLayout, QInputDialog, QLabel, QSpinBox, QFrame, QListWidget, QTextEdit, QMessageBox)
 
 from core import SensorPipeline
 from services import FileLogger
@@ -20,6 +20,8 @@ class DeviceTab(QWidget):
         super().__init__(parent)
         self.pipeline = pipeline
         self.signals = UiSignals()
+        self._connecting = False
+        self._connected = False
 
         # Left Section
         self.scan_button = QPushButton("Scan for Devices")
@@ -29,7 +31,7 @@ class DeviceTab(QWidget):
         self.scan_timeout_spin.setValue(10)
 
         # https://icons8.com/icon/6POIOo0Oa76N/spinner icon by https://icons8.com
-        self.spinner = QMovie("../static/loading.gif")
+        self.scan_spinner = QMovie("../static/loading.gif")
 
         self.devices = QListWidget()
         self.devices.setFont(QFont("Courier New", weight=500))
@@ -54,30 +56,72 @@ class DeviceTab(QWidget):
         # Middle Section
         device_label = QLabel("Selected Device:")
         self.current_device = QLabel("None")
+
+        self.interval_spin = QSpinBox()
+        self.interval_spin.setRange(0, 604800)
+        self.interval_spin.setValue(10)
+
+        # https://icons8.com/icon/6POIOo0Oa76N/spinner Spinner icon by https://icons8.com
+        self.connect_spinner = QMovie("../static/loading.gif")
+
         self.connect_button = QPushButton("Connect")
         self.connect_button.setMinimumHeight(40)
+        self.connect_button.setEnabled(False)
         self.stop_button = QPushButton("Stop")
         self.stop_button.setMinimumHeight(40)
+        self.stop_button.setEnabled(False)
 
         device_display = QHBoxLayout()
         device_display.addWidget(device_label)
         device_display.addWidget(self.current_device)
 
+        interval_control = QHBoxLayout()
+        interval_control.addWidget(QLabel("Data Capture Interval (s)"))
+        interval_control.addWidget(self.interval_spin)
+
         connection_controls = QHBoxLayout()
         connection_controls.addWidget(self.connect_button)
         connection_controls.addWidget(self.stop_button)
 
-        mid_layout = QVBoxLayout()
-        mid_layout.setAlignment(Qt.AlignTop)
-        mid_label = QLabel("Device Connection")
-        mid_layout.addWidget(mid_label)
-        mid_layout.addLayout(device_display)
-        mid_layout.addLayout(connection_controls)
+        self.data_log = QTextEdit()
+        self.data_log.setReadOnly(True)
+        self.data_log.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        self.ts_label = QLabel("Timestamp: --")
+        self.temp_label = QLabel("Temperature: --")
+        self.hum_label = QLabel("Humidity: --")
+        self.bat_label = QLabel("Battery: --")
+        self.spo2_label = QLabel("SpO2: --")
+        self.pr_label = QLabel("Pulse Rate: --")
+
+        self.data_row_1 = QHBoxLayout()
+        self.data_row_1.addWidget(self.ts_label)
+        self.data_row_1.addWidget(self.temp_label)
+
+        self.data_row_2 = QHBoxLayout()
+        self.data_row_2.addWidget(self.hum_label)
+        self.data_row_2.addWidget(self.bat_label)
+
+        self.data_row_3 = QHBoxLayout()
+        self.data_row_3.addWidget(self.spo2_label)
+        self.data_row_3.addWidget(self.pr_label)
+
+        self.mid_layout = QVBoxLayout()
+        self.mid_layout.setAlignment(Qt.AlignTop)
+        mid_label_device = QLabel("Device Connection")
+        self.mid_layout.addWidget(mid_label_device)
+        self.mid_layout.addLayout(device_display)
+        self.mid_layout.addLayout(interval_control)
+        self.mid_layout.addLayout(connection_controls)
+
+        mid_label_data = QLabel("Live Data")
+        self.mid_layout.addWidget(mid_label_data)
+        self.mid_layout.addWidget(self.data_log)
 
         # Right Section
         right_layout = QVBoxLayout()
         right_layout.setAlignment(Qt.AlignTop)
-        right_label = QLabel("Data Capture")
+        right_label = QLabel("Data Transmission")
         right_layout.addWidget(right_label)
 
         # Main
@@ -85,7 +129,8 @@ class DeviceTab(QWidget):
         font.setPointSize(16)
         font.setBold(True)
         left_label.setFont(font)
-        mid_label.setFont(font)
+        mid_label_device.setFont(font)
+        mid_label_data.setFont(font)
         right_label.setFont(font)
 
         divider = QFrame()
@@ -100,32 +145,23 @@ class DeviceTab(QWidget):
 
         main_layout = QHBoxLayout()
         main_layout.setSpacing(10)
-        main_layout.addLayout(left_layout, 1)
+        main_layout.addLayout(left_layout, 6)
         main_layout.addWidget(divider)
-        main_layout.addLayout(mid_layout, 1)
+        main_layout.addLayout(self.mid_layout, 7)
         main_layout.addWidget(divider2)
-        main_layout.addLayout(right_layout, 1)
+        main_layout.addLayout(right_layout, 6)
         self.setLayout(main_layout)
 
         self.scan_button.clicked.connect(self.on_scan_clicked)
+        self.devices.itemDoubleClicked.connect(self.on_device_selected)
+        self.connect_button.clicked.connect(self.on_connect_clicked)
+        self.stop_button.clicked.connect(self.on_stop_clicked)
 
         self.signals.devices.connect(self.on_devices)
 
     @qasync.asyncSlot()
     async def on_scan_clicked(self):
-        self.scan_button.setEnabled(False)
-        self.scan_button.setText("")
-        self.scan_button.setIcon(QIcon())
-        _original_style = self.scan_button.styleSheet()
-        self.scan_button.setStyleSheet("border: none; background: transparent;")
-        
-        overlay = QLabel(self.scan_button)
-        overlay.setMovie(self.spinner)
-        overlay.setAlignment(Qt.AlignCenter)
-        overlay.setGeometry(self.scan_button.rect())
-        overlay.show()
-        self.spinner.start()
-
+        (style, overlay) = self.button_start_loading(self.scan_button, self.scan_spinner)
         timeout = self.scan_timeout_spin.value()
         try:
             devices = await self.pipeline.scan(timeout)
@@ -134,18 +170,69 @@ class DeviceTab(QWidget):
         except Exception as e:
             print(f"Scan failed: {e}")
         finally:
-            self.spinner.stop()
-            overlay.hide()
-            self.scan_button.setText("Scan for Devices")
-            self.scan_button.setEnabled(True)
-            self.scan_button.setStyleSheet(_original_style)
+            self.button_stop_loading(self.scan_button, self.scan_spinner, overlay, style, "Scan for Devices")
 
-    def on_devices(self, devices):
+    @qasync.asyncSlot()
+    async def on_connect_clicked(self):
+        if self._connecting or self._connected:
+            return
+
+        self.devices.setEnabled(False)
+        self.scan_button.setEnabled(False)
+        (style, overlay) = self.button_start_loading(self.connect_button, self.connect_spinner)
+
+        address = self.current_device.text().split(" (")[1].strip(")")
+        try:
+            await self.pipeline.connect(address)
+            self._connected = True
+            self._connecting = False
+
+            self.button_stop_loading(self.connect_button, self.connect_spinner, overlay, style, "Connect")
+
+            # https://icons8.com/icon/63262/checkmark Tick icon by https://icons8.com
+            self.check_mark = QIcon("../static/tick.svg")
+            self.connect_button.setIcon(self.check_mark)
+            self.connect_button.setText("Connected")
+            self.connect_button.setEnabled(False)
+            self.stop_button.setEnabled(True)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error occurred", str(e))
+
+            self.devices.setEnabled(True)
+            self.scan_button.setEnabled(True)
+            self.button_stop_loading(self.connect_button, self.connect_spinner, overlay, style, "Connect")
+
+    @qasync.asyncSlot()
+    async def on_stop_clicked(self):
+        if not self._connected:
+            return
+
+        try:
+            await self.pipeline.close()
+        finally:
+            self._connected = False
+            self.connect_button.setText("Connect")
+            self.connect_button.setEnabled(True)
+            self.connect_button.setIcon(QIcon())
+            self.stop_button.setEnabled(False)
+            self.scan_button.setEnabled(True)
+            self.devices.setEnabled(True)
+
+    def on_devices(self, devices: dict):
         self.devices.clear()
         for device in devices:
             self.devices.addItem(f"{device['address']:17} | {device['name']}")
         self.update_gray_out()
-    
+
+    def on_device_selected(self, device):
+        info = device.text().split(" | ")
+        self.current_device.setText(f"{info[1]} ({info[0]})")
+
+        self.connect_button.setEnabled(True)
+        self.connect_button.setText("Connect")
+        self.stop_button.setEnabled(False)
+
     def update_gray_out(self):
         palette = self.devices.palette()
         if self.devices.count() == 0:
@@ -155,7 +242,29 @@ class DeviceTab(QWidget):
             palette.setColor(QPalette.Base, QColor("white"))
             palette.setColor(QPalette.Text, QColor("black"))
         self.devices.setPalette(palette)
-        
+
+    def button_start_loading(self, button: QPushButton, spinner: QMovie):
+        button.setEnabled(False)
+        button.setText("")
+        button.setIcon(QIcon())
+        original_style = button.styleSheet()
+        button.setStyleSheet("border: none; background: transparent;")
+
+        overlay = QLabel(button)
+        overlay.setMovie(spinner)
+        overlay.setAlignment(Qt.AlignCenter)
+        overlay.setGeometry(button.rect())
+        overlay.show()
+        spinner.start()
+
+        return original_style, overlay
+    
+    def button_stop_loading(self, button: QPushButton, spinner: QMovie, overlay: QLabel, style: str, button_text: str):
+        spinner.stop()
+        overlay.hide()
+        button.setText(button_text)
+        button.setEnabled(True)
+        button.setStyleSheet(style)
 
 class MainWindow(QWidget):
     def __init__(self):
