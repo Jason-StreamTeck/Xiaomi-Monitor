@@ -131,6 +131,8 @@ async def main(args):
                 print(f"Attempting to connect with device...")
                 await asyncio.create_task(pipeline.connect())
 
+                print(f"Successfully established a connection with {self.address}.")
+
                 loop = asyncio.get_event_loop()
                 event = asyncio.Event()
                 def action_input():

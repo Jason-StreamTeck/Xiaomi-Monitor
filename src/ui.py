@@ -1,13 +1,14 @@
 import sys
 import asyncio
 import qasync
+from datetime import datetime
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QPalette, QColor, QMovie
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QApplication, QWidget, QTabWidget, QPushButton, QHBoxLayout, QVBoxLayout, QInputDialog, QLabel, QSpinBox, QFrame, QListWidget, QTextEdit, QMessageBox)
+from PySide6.QtWidgets import (QApplication, QWidget, QTabWidget, QPushButton, QHBoxLayout, QVBoxLayout, QInputDialog, QLabel, QSpinBox, QFrame, QListWidget, QTextEdit, QMessageBox, QBoxLayout)
 
-from core import SensorPipeline
+from core import SensorPipeline, Measurement
 from services import FileLogger
 
 class UiSignals(QObject):
@@ -22,6 +23,7 @@ class DeviceTab(QWidget):
         self.signals = UiSignals()
         self._connecting = False
         self._connected = False
+        self._data_source = None
 
         # Left Section
         self.scan_button = QPushButton("Scan for Devices")
@@ -37,7 +39,7 @@ class DeviceTab(QWidget):
         self.devices.setFont(QFont("Courier New", weight=500))
 
         timeout_control = QHBoxLayout()
-        timeout_control.addWidget(QLabel("Timeout Duration (s)"))
+        timeout_control.addWidget(QLabel("Scan Duration (s)"))
         timeout_control.addWidget(self.scan_timeout_spin)
 
         scanner_controls = QVBoxLayout()
@@ -51,7 +53,7 @@ class DeviceTab(QWidget):
         left_layout.addWidget(self.devices)
         left_layout.addLayout(scanner_controls)
 
-        self.update_gray_out()
+        self._update_gray_out(self.devices, self.devices.count() == 0)
 
         # Middle Section
         device_label = QLabel("Selected Device:")
@@ -59,7 +61,7 @@ class DeviceTab(QWidget):
 
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(0, 604800)
-        self.interval_spin.setValue(10)
+        self.interval_spin.setValue(0)
 
         # https://icons8.com/icon/6POIOo0Oa76N/spinner Spinner icon by https://icons8.com
         self.connect_spinner = QMovie("../static/loading.gif")
@@ -94,17 +96,20 @@ class DeviceTab(QWidget):
         self.spo2_label = QLabel("SpO2: --")
         self.pr_label = QLabel("Pulse Rate: --")
 
+        data_font  = QFont()
+        data_font.setWeight(QFont.Weight.Bold)
+        self.ts_label.setFont(data_font)
+        self.temp_label.setFont(data_font)
+        self.hum_label.setFont(data_font)
+        self.bat_label.setFont(data_font)
+        self.spo2_label.setFont(data_font)
+        self.pr_label.setFont(data_font)
+
         self.data_row_1 = QHBoxLayout()
-        self.data_row_1.addWidget(self.ts_label)
-        self.data_row_1.addWidget(self.temp_label)
-
         self.data_row_2 = QHBoxLayout()
-        self.data_row_2.addWidget(self.hum_label)
-        self.data_row_2.addWidget(self.bat_label)
-
-        self.data_row_3 = QHBoxLayout()
-        self.data_row_3.addWidget(self.spo2_label)
-        self.data_row_3.addWidget(self.pr_label)
+        latest_data_layout = QVBoxLayout()
+        latest_data_layout.addLayout(self.data_row_1)
+        latest_data_layout.addLayout(self.data_row_2)
 
         self.mid_layout = QVBoxLayout()
         self.mid_layout.setAlignment(Qt.AlignTop)
@@ -116,7 +121,10 @@ class DeviceTab(QWidget):
 
         mid_label_data = QLabel("Live Data")
         self.mid_layout.addWidget(mid_label_data)
+        self.mid_layout.addLayout(latest_data_layout)
         self.mid_layout.addWidget(self.data_log)
+
+        self._update_gray_out(self.data_log, not bool(self.data_log.toPlainText()))
 
         # Right Section
         right_layout = QVBoxLayout()
@@ -158,10 +166,16 @@ class DeviceTab(QWidget):
         self.stop_button.clicked.connect(self.on_stop_clicked)
 
         self.signals.devices.connect(self.on_devices)
+        self.signals.measurement.connect(self.on_measurement)
+
+        self.pipeline.register(self.notify_sub)
+        # logger = FileLogger("monitor_data", "w")
+        # pipeline.register(logger.sub)
+
 
     @qasync.asyncSlot()
     async def on_scan_clicked(self):
-        (style, overlay) = self.button_start_loading(self.scan_button, self.scan_spinner)
+        (style, overlay) = self._button_start_loading(self.scan_button, self.scan_spinner)
         timeout = self.scan_timeout_spin.value()
         try:
             devices = await self.pipeline.scan(timeout)
@@ -170,7 +184,8 @@ class DeviceTab(QWidget):
         except Exception as e:
             print(f"Scan failed: {e}")
         finally:
-            self.button_stop_loading(self.scan_button, self.scan_spinner, overlay, style, "Scan for Devices")
+            self._button_stop_loading(self.scan_button, self.scan_spinner, overlay, style, "Scan for Devices")
+
 
     @qasync.asyncSlot()
     async def on_connect_clicked(self):
@@ -179,7 +194,8 @@ class DeviceTab(QWidget):
 
         self.devices.setEnabled(False)
         self.scan_button.setEnabled(False)
-        (style, overlay) = self.button_start_loading(self.connect_button, self.connect_spinner)
+        self.interval_spin.setEnabled(False)
+        (style, overlay) = self._button_start_loading(self.connect_button, self.connect_spinner)
 
         address = self.current_device.text().split(" (")[1].strip(")")
         try:
@@ -187,7 +203,7 @@ class DeviceTab(QWidget):
             self._connected = True
             self._connecting = False
 
-            self.button_stop_loading(self.connect_button, self.connect_spinner, overlay, style, "Connect")
+            self._button_stop_loading(self.connect_button, self.connect_spinner, overlay, style, "Connect")
 
             # https://icons8.com/icon/63262/checkmark Tick icon by https://icons8.com
             self.check_mark = QIcon("../static/tick.svg")
@@ -201,7 +217,9 @@ class DeviceTab(QWidget):
 
             self.devices.setEnabled(True)
             self.scan_button.setEnabled(True)
-            self.button_stop_loading(self.connect_button, self.connect_spinner, overlay, style, "Connect")
+            self.interval_spin.setEnabled(True)
+            self._button_stop_loading(self.connect_button, self.connect_spinner, overlay, style, "Connect")
+
 
     @qasync.asyncSlot()
     async def on_stop_clicked(self):
@@ -219,11 +237,46 @@ class DeviceTab(QWidget):
             self.scan_button.setEnabled(True)
             self.devices.setEnabled(True)
 
+
     def on_devices(self, devices: dict):
         self.devices.clear()
         for device in devices:
             self.devices.addItem(f"{device['address']:17} | {device['name']}")
-        self.update_gray_out()
+        self._update_gray_out(self.devices, self.devices.count() == 0)
+
+
+    def on_measurement(self, data: dict):
+        if not self._data_source == data["source"]:
+            self._removeAllWidgets(self.data_row_1)
+            self._removeAllWidgets(self.data_row_2)
+            self._update_gray_out(self.data_log, False)
+
+            if data["source"] == "XIAOMI":
+                self._data_source = "XIAOMI"
+                self.data_row_1.addWidget(self.ts_label)
+                self.data_row_1.addWidget(self.temp_label)
+                self.data_row_2.addWidget(self.hum_label)
+                self.data_row_2.addWidget(self.bat_label)
+            if data["source"] == "O2RING":
+                self._data_source = "O2RING"
+                self.data_row_1.addWidget(self.ts_label)
+                self.data_row_2.addWidget(self.spo2_label)
+                self.data_row_2.addWidget(self.pr_label)
+
+        ts = datetime.fromtimestamp(data['data']['timestamp'])
+        self.ts_label.setText(f"Timestamp: {ts.strftime('%d/%m %H:%M:%S')}")
+
+        if self._data_source == "XIAOMI":
+            self.temp_label.setText(f"Temperature: {data['data']['temperature']:.1f}°C")
+            self.hum_label.setText(f"Humidity: {data['data']['humidity']}%")
+            self.bat_label.setText(f"Battery: {data['data']['battery']}%")
+
+        if self._data_source == "O2RING":
+            self.spo2_label.setText(f"SpO2: {data['data']['spo2']}%")
+            self.pr_label.setText(f"Pulse Rate: {data['data']['pr']} BPM")
+
+        self.data_log.append(f"{str(data)}\n")
+
 
     def on_device_selected(self, device):
         info = device.text().split(" | ")
@@ -233,17 +286,19 @@ class DeviceTab(QWidget):
         self.connect_button.setText("Connect")
         self.stop_button.setEnabled(False)
 
-    def update_gray_out(self):
-        palette = self.devices.palette()
-        if self.devices.count() == 0:
+
+    def _update_gray_out(self, widget: QWidget, setGray: bool):
+        palette = widget.palette()
+        if setGray:
             palette.setColor(QPalette.Base, QColor("#f0f0f0"))
             palette.setColor(QPalette.Text, QColor("#a0a0a0"))
         else:
             palette.setColor(QPalette.Base, QColor("white"))
             palette.setColor(QPalette.Text, QColor("black"))
-        self.devices.setPalette(palette)
+        widget.setPalette(palette)
 
-    def button_start_loading(self, button: QPushButton, spinner: QMovie):
+
+    def _button_start_loading(self, button: QPushButton, spinner: QMovie):
         button.setEnabled(False)
         button.setText("")
         button.setIcon(QIcon())
@@ -259,12 +314,48 @@ class DeviceTab(QWidget):
 
         return original_style, overlay
     
-    def button_stop_loading(self, button: QPushButton, spinner: QMovie, overlay: QLabel, style: str, button_text: str):
+
+    def _button_stop_loading(self, button: QPushButton, spinner: QMovie, overlay: QLabel, style: str, button_text: str):
         spinner.stop()
         overlay.hide()
         button.setText(button_text)
         button.setEnabled(True)
         button.setStyleSheet(style)
+
+
+    def _removeAllWidgets(self, layout: QBoxLayout):
+        i = 0
+        while layout.count():
+            item = layout.takeAt(i)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+                i += 1
+
+
+    def notify_sub(self, data: Measurement):
+        if data.source == "XIAOMI":
+            data_dict = {
+                "source": data.source,
+                "data": {
+                    "timestamp": data.data.timestamp,
+                    "temperature": data.data.temperature,
+                    "humidity": data.data.humidity,
+                    "battery": data.data.battery,
+                }
+            }
+        if data.source == "O2RING":
+            data_dict = {
+                "source": data.source,
+                "data": {
+                    "timestamp": data.data.timestamp,
+                    "spo2": data.data.spo2,
+                    "pr": data.data.pr,
+                }
+            }
+        self.signals.measurement.emit(data_dict)
+
+
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -288,13 +379,12 @@ class MainWindow(QWidget):
         self.add_tab_button.clicked.connect(self.new_tab)
         self.tab_widget.tabCloseRequested.connect(self.remove_tab)
         self.tab_widget.tabBar().tabBarDoubleClicked.connect(self.rename_tab)
-    
+
+
     def new_tab(self):
         pipeline = SensorPipeline()
-        logger = FileLogger("monitor_data", "w")
-        pipeline.register(logger.sub)
-
         device_tab = DeviceTab(pipeline)
+
         index = self.tab_widget.addTab(device_tab, f"Device {len(self.tabs) + 1}")
         self.tab_widget.setCurrentIndex(index)
         self.tabs.append(device_tab)
@@ -303,7 +393,8 @@ class MainWindow(QWidget):
             self.tab_widget.setTabsClosable(True)
         else:
             self.tab_widget.setTabsClosable(False)
-        
+
+
     def rename_tab(self, index):
         if index == -1: return
         current_name = self.tab_widget.tabText(index)
@@ -311,10 +402,11 @@ class MainWindow(QWidget):
         if ok and new_name:
             self.tab_widget.setTabText(index, new_name)
 
+
     def remove_tab(self, index):
         tab = self.tab_widget.widget(index)
         try:
-            tab.pipeline.close()
+            asyncio.create_task(tab.pipeline.close())
         except Exception:
             pass
         self.tabs.pop(index)
@@ -322,6 +414,8 @@ class MainWindow(QWidget):
 
         if len(self.tabs) <= 1:
             self.tab_widget.setTabsClosable(False)
+
+
 
 async def main():
     app = QApplication.instance()

@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Compatible BLE Devices and corresponding characteristics
 MI_DEVICE_NAME = "LYWSD03MMC"
 O2_DEVICE_NAME = "O2Ring"
 
@@ -29,6 +30,10 @@ class SensorPipeline:
         self.send_task = None
         self.write_task = None
 
+    def set_interval(self, interval):
+        self.interval = interval
+        self.hub.set_interval(interval)
+
     async def scan(self, timeout: float = 10.0):
         devices = await BleakScanner.discover(timeout=timeout)
         return devices
@@ -43,8 +48,6 @@ class SensorPipeline:
         await self.client.connect()
         if not self.client.is_connected:
             raise RuntimeError(f"Failed to connect to {self.address}.")
-
-        print(f"Successfully established a connection with {self.address}.")
 
         notify_char = self._get_notify_char(self.client)
         await self.client.start_notify(notify_char, self.hub.handle_notify)

@@ -15,7 +15,7 @@ class FileLogger:
                 self.writer.writerow(["Timestamp_s", "SpO2_%", "PulseRate_BPM"])
             self.header = True
 
-        self.writer.writerow([x for x in data.data])
+        self.writer.writerow([value for _key, value in data.data])
     
     def close(self):
         self.file.close()

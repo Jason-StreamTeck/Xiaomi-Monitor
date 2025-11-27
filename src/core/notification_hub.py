@@ -19,6 +19,9 @@ class NotificationHub:
         self.verbose = verbose
         self.latest_data = None
 
+    def set_interval(self, interval):
+        self.interval = interval
+
     def register(self, sub):
         self.subs.append(sub)
 
@@ -56,7 +59,7 @@ class NotificationHub:
             )
 
         self.latest_data = decoded
-        if self.interval == None:
+        if self.interval:
             self._send_data(decoded)
 
     async def send_interval(self):
