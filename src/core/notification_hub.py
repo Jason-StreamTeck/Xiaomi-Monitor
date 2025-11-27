@@ -20,6 +20,7 @@ class NotificationHub:
         self.latest_data = None
 
     def set_interval(self, interval):
+        print("INTERVAL VALUE SET")
         self.interval = interval
 
     def register(self, sub):
@@ -59,14 +60,15 @@ class NotificationHub:
             )
 
         self.latest_data = decoded
-        if self.interval:
+        if not self.interval:
             self._send_data(decoded)
 
     async def send_interval(self):
         while True:
             if self.latest_data:
-                (_ts, temp, humid, bat) = self.latest_data
-                self._send_data(time.time(), temp, humid, bat)
+                new_data = self.latest_data
+                new_data.data.timestamp = time.time()
+                self._send_data(new_data)
             await asyncio.sleep(self.interval)
 
     def _send_data(self, data: Measurement):

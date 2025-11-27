@@ -192,6 +192,7 @@ class DeviceTab(QWidget):
         if self._connecting or self._connected:
             return
 
+        self.pipeline.set_interval(self.interval_spin.value())
         self.devices.setEnabled(False)
         self.scan_button.setEnabled(False)
         self.interval_spin.setEnabled(False)
