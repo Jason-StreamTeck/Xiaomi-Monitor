@@ -3,6 +3,14 @@ from core import Measurement
 
 class FileLogger:
     def __init__(self, filename, action):
+        self.filename = filename
+        self.action = action
+        self.file = None
+        self.writer = None
+        self.header: bool = None
+        self.open(self.filename, self.action)
+
+    def open(self, filename: str, action: str):
         self.file = open(filename + '.csv', action, newline="", buffering=1)
         self.writer = csv.writer(self.file)
         self.header = action != "w"

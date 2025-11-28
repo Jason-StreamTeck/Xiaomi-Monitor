@@ -6,7 +6,9 @@ from datetime import datetime
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QPalette, QColor, QMovie
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QApplication, QWidget, QTabWidget, QPushButton, QHBoxLayout, QVBoxLayout, QInputDialog, QLabel, QSpinBox, QFrame, QListWidget, QTextEdit, QMessageBox, QBoxLayout)
+from PySide6.QtWidgets import (QApplication, QWidget, QTabWidget, QPushButton, QHBoxLayout, QVBoxLayout, QInputDialog,
+                               QLabel, QSpinBox, QFrame, QListWidget, QTextEdit, QMessageBox, QBoxLayout, QLineEdit,
+                               QComboBox, QGroupBox, QFormLayout, QFileDialog)
 
 from core import SensorPipeline, Measurement
 from services import FileLogger
@@ -24,6 +26,8 @@ class DeviceTab(QWidget):
         self._connecting = False
         self._connected = False
         self._data_source = None
+
+        self.logger: FileLogger | None = None
 
         # Left Section
         self.scan_button = QPushButton("Scan for Devices")
@@ -127,10 +131,26 @@ class DeviceTab(QWidget):
         self._update_gray_out(self.data_log, not bool(self.data_log.toPlainText()))
 
         # Right Section
+        self.file_name = QLineEdit("monitor_data")
+        self.file_extension = QComboBox()
+        self.file_extension.addItems([".csv"])
+        self.file_mode = QComboBox()
+        self.file_mode.addItems(["write", "append"])
+        self.file_browse_button = QPushButton("Browse...")
+
+        self.file_group = QGroupBox("File Output")
+        file_layout = QFormLayout()
+        file_layout.addRow("File name: ", self.file_name)
+        file_layout.addRow("Extension: ", self.file_extension)
+        file_layout.addRow("Mode: ", self.file_mode)
+        file_layout.addRow(self.file_browse_button)
+        self.file_group.setLayout(file_layout)
+
         right_layout = QVBoxLayout()
         right_layout.setAlignment(Qt.AlignTop)
         right_label = QLabel("Data Transmission")
         right_layout.addWidget(right_label)
+        right_layout.addWidget(self.file_group)
 
         # Main
         font = QFont()
@@ -164,13 +184,10 @@ class DeviceTab(QWidget):
         self.devices.itemDoubleClicked.connect(self.on_device_selected)
         self.connect_button.clicked.connect(self.on_connect_clicked)
         self.stop_button.clicked.connect(self.on_stop_clicked)
+        self.file_browse_button.clicked.connect(self.on_browse_clicked)
 
         self.signals.devices.connect(self.on_devices)
         self.signals.measurement.connect(self.on_measurement)
-
-        self.pipeline.register(self.notify_sub)
-        # logger = FileLogger("monitor_data", "w")
-        # pipeline.register(logger.sub)
 
 
     @qasync.asyncSlot()
@@ -196,7 +213,13 @@ class DeviceTab(QWidget):
         self.devices.setEnabled(False)
         self.scan_button.setEnabled(False)
         self.interval_spin.setEnabled(False)
+        self.file_group.setEnabled(False)
         (style, overlay) = self._button_start_loading(self.connect_button, self.connect_spinner)
+
+        self.logger = FileLogger(self.file_name.text(), self.file_mode.currentText()[0])
+        self.pipeline.register(self.logger.sub)
+
+        self.pipeline.register(self.notify_sub)
 
         address = self.current_device.text().split(" (")[1].strip(")")
         try:
@@ -215,10 +238,13 @@ class DeviceTab(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "Error occurred", str(e))
+            self.pipeline.hub.clear()
+            self.logger.close()
 
             self.devices.setEnabled(True)
             self.scan_button.setEnabled(True)
             self.interval_spin.setEnabled(True)
+            self.file_group.setEnabled(True)
             self._button_stop_loading(self.connect_button, self.connect_spinner, overlay, style, "Connect")
 
 
@@ -230,13 +256,30 @@ class DeviceTab(QWidget):
         try:
             await self.pipeline.close()
         finally:
+            self.pipeline.hub.clear()
+            self.logger.close()
+
             self._connected = False
-            self.connect_button.setText("Connect")
-            self.connect_button.setEnabled(True)
-            self.connect_button.setIcon(QIcon())
             self.stop_button.setEnabled(False)
+            self.connect_button.setText("Connect")
+            self.connect_button.setIcon(QIcon())
+            self.connect_button.setEnabled(True)
             self.scan_button.setEnabled(True)
+            self.file_group.setEnabled(True)
             self.devices.setEnabled(True)
+
+
+    def on_browse_clicked(self):
+        file_name = self.file_name.text().strip() or "monitor_data"
+        extension = self.file_extension.currentText()
+        output_file_name, _ = QFileDialog.getSaveFileName(
+            self, "Choose file", f"{file_name}{extension}", f"{extension.upper()} Files (*{extension})"
+        )
+
+        if output_file_name:
+            if output_file_name.lower().endswith(extension):
+                output_file_name = output_file_name[:-len(extension)]
+            self.file_name.setText(output_file_name)
 
 
     def on_devices(self, devices: dict):

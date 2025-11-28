@@ -19,12 +19,15 @@ class NotificationHub:
         self.verbose = verbose
         self.latest_data = None
 
+    def clear(self):
+        self.subs = []
+
     def set_interval(self, interval):
-        print("INTERVAL VALUE SET")
         self.interval = interval
 
     def register(self, sub):
-        self.subs.append(sub)
+        if (sub not in self.subs):
+            self.subs.append(sub)
 
     def handle_notify(self, characteristic: BleakGATTCharacteristic, data: bytearray):
         decoded = {}
