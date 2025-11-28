@@ -4,7 +4,7 @@ import websockets
 from core import Measurement
 
 class WebSocketServer:
-    def __init__(self, host: str, port: int, verbose: bool):
+    def __init__(self, host: str, port: int, verbose: bool = False):
         self.host = host
         self.port = port
         self.verbose = verbose

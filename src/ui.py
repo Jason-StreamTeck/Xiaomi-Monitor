@@ -1,17 +1,19 @@
 import sys
 import asyncio
+from asyncio import Task
 import qasync
 from datetime import datetime
+from typing import Dict, Union
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QPalette, QColor, QMovie
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QApplication, QWidget, QTabWidget, QPushButton, QHBoxLayout, QVBoxLayout, QInputDialog,
                                QLabel, QSpinBox, QFrame, QListWidget, QTextEdit, QMessageBox, QBoxLayout, QLineEdit,
-                               QComboBox, QGroupBox, QFormLayout, QFileDialog)
+                               QComboBox, QGroupBox, QFormLayout, QFileDialog, QCheckBox)
 
 from core import SensorPipeline, Measurement
-from services import FileLogger
+from services import FileLogger, APIServer, SocketServer, WebSocketServer
 
 class UiSignals(QObject):
     measurement = Signal(dict)
@@ -28,6 +30,16 @@ class DeviceTab(QWidget):
         self._data_source = None
 
         self.logger: FileLogger | None = None
+        self.services: Dict[str, Union[APIServer, SocketServer, WebSocketServer]] = {
+            "api": None,
+            "tcp": None,
+            "ws": None
+        }
+        self.tasks: Dict[str, Task] = {
+            "api": None,
+            "tcp": None,
+            "ws": None
+        }
 
         # Left Section
         self.scan_button = QPushButton("Scan for Devices")
@@ -146,11 +158,42 @@ class DeviceTab(QWidget):
         file_layout.addRow(self.file_browse_button)
         self.file_group.setLayout(file_layout)
 
+        self.enable_api = QCheckBox("Enable API")
+        self.api_url = QLineEdit("http://127.0.0.1:8000")
+
+        self.enable_tcp = QCheckBox("Enable Socket")
+        self.tcp_host = QLineEdit("127.0.0.1")
+        self.tcp_port = QSpinBox()
+        self.tcp_port.setRange(1, 65536)
+        self.tcp_port.setValue(55555)
+
+        self.enable_ws = QCheckBox("Enable WebSocket")
+        self.ws_host = QLineEdit("127.0.0.1")
+        self.ws_port = QSpinBox()
+        self.ws_port.setRange(1, 65536)
+        self.ws_port.setValue(80)
+
+        self.services_button = QPushButton("Apply Services")
+
+        self.serv_group = QGroupBox("Optional Services")
+        serv_layout = QFormLayout()
+        serv_layout.addRow(self.enable_api)
+        serv_layout.addRow("API URL:", self.api_url)
+        serv_layout.addRow(self.enable_tcp)
+        serv_layout.addRow("Socket Host:", self.tcp_host)
+        serv_layout.addRow("Socket Port:", self.tcp_port)
+        serv_layout.addRow(self.enable_ws)
+        serv_layout.addRow("WebSocket Host:", self.ws_host)
+        serv_layout.addRow("WebSocket Port:", self.ws_port)
+        serv_layout.addRow(self.services_button)
+        self.serv_group.setLayout(serv_layout)
+
         right_layout = QVBoxLayout()
         right_layout.setAlignment(Qt.AlignTop)
         right_label = QLabel("Data Transmission")
         right_layout.addWidget(right_label)
         right_layout.addWidget(self.file_group)
+        right_layout.addWidget(self.serv_group)
 
         # Main
         font = QFont()
@@ -161,22 +204,22 @@ class DeviceTab(QWidget):
         mid_label_data.setFont(font)
         right_label.setFont(font)
 
-        divider = QFrame()
-        divider.setFrameShape(QFrame.VLine)
-        divider.setFrameShadow(QFrame.Sunken)
-        divider.setLineWidth(1)
+        main_div_1 = QFrame()
+        main_div_1.setFrameShape(QFrame.VLine)
+        main_div_1.setFrameShadow(QFrame.Sunken)
+        main_div_1.setLineWidth(1)
 
-        divider2 = QFrame()
-        divider2.setFrameShape(QFrame.VLine)
-        divider2.setFrameShadow(QFrame.Sunken)
-        divider2.setLineWidth(1)
+        main_div_2 = QFrame()
+        main_div_2.setFrameShape(QFrame.VLine)
+        main_div_2.setFrameShadow(QFrame.Sunken)
+        main_div_2.setLineWidth(1)
 
         main_layout = QHBoxLayout()
         main_layout.setSpacing(10)
         main_layout.addLayout(left_layout, 6)
-        main_layout.addWidget(divider)
+        main_layout.addWidget(main_div_1)
         main_layout.addLayout(self.mid_layout, 7)
-        main_layout.addWidget(divider2)
+        main_layout.addWidget(main_div_2)
         main_layout.addLayout(right_layout, 6)
         self.setLayout(main_layout)
 
@@ -185,6 +228,7 @@ class DeviceTab(QWidget):
         self.connect_button.clicked.connect(self.on_connect_clicked)
         self.stop_button.clicked.connect(self.on_stop_clicked)
         self.file_browse_button.clicked.connect(self.on_browse_clicked)
+        self.services_button.clicked.connect(self.on_services_clicked)
 
         self.signals.devices.connect(self.on_devices)
         self.signals.measurement.connect(self.on_measurement)
@@ -217,9 +261,8 @@ class DeviceTab(QWidget):
         (style, overlay) = self._button_start_loading(self.connect_button, self.connect_spinner)
 
         self.logger = FileLogger(self.file_name.text(), self.file_mode.currentText()[0])
-        self.pipeline.register(self.logger.sub)
-
-        self.pipeline.register(self.notify_sub)
+        self.pipeline.hub.register(self.logger.sub)
+        self.pipeline.hub.register(self.notify_sub)
 
         address = self.current_device.text().split(" (")[1].strip(")")
         try:
@@ -235,10 +278,11 @@ class DeviceTab(QWidget):
             self.connect_button.setText("Connected")
             self.connect_button.setEnabled(False)
             self.stop_button.setEnabled(True)
-
-        except Exception as e:
+        
+        except (asyncio.CancelledError, Exception) as e:
             QMessageBox.critical(self, "Error occurred", str(e))
-            self.pipeline.hub.clear()
+            self.pipeline.hub.remove(self.logger.sub)
+            self.pipeline.hub.remove(self.notify_sub)
             self.logger.close()
 
             self.devices.setEnabled(True)
@@ -256,8 +300,11 @@ class DeviceTab(QWidget):
         try:
             await self.pipeline.close()
         finally:
-            self.pipeline.hub.clear()
+            self.pipeline.hub.remove(self.logger.sub)
+            self.pipeline.hub.remove(self.notify_sub)
             self.logger.close()
+
+            self._update_gray_out(self.data_log, True)
 
             self._connected = False
             self.stop_button.setEnabled(False)
@@ -280,6 +327,56 @@ class DeviceTab(QWidget):
             if output_file_name.lower().endswith(extension):
                 output_file_name = output_file_name[:-len(extension)]
             self.file_name.setText(output_file_name)
+
+
+    @qasync.asyncSlot()
+    async def on_services_clicked(self):
+        if self.enable_api.isChecked() and self.api_url.text() and not self.services.get('api'):
+            api_host = self.api_url.text()
+            self._safe_service_start(
+                'api',
+                APIServer(api_host),
+                f"[Service] API Service Started on {api_host}",
+                "[Service] API Service Starting Error: {error}"
+            )
+        elif not self.enable_api.isChecked() and self.services.get('api'):
+            asyncio.create_task(self._safe_service_removal(
+                'api',
+                "[Service] API Service Stopped",
+                "[Service] API Service Stopping Error: {error}"
+            ))
+
+        if self.enable_tcp.isChecked() and self.tcp_host.text() and not self.services.get('tcp'):
+            tcp_host = self.tcp_host.text()
+            tcp_port = self.tcp_port.value()
+            self._safe_service_start(
+                'tcp',
+                SocketServer(tcp_host, tcp_port),
+                f"[Service] Socket Service Started on {tcp_host}:{tcp_port}",
+                "[Service] Socket Service Starting Error: {error}"
+            )
+        elif not self.enable_tcp.isChecked() and self.services.get('tcp'):
+            asyncio.create_task(self._safe_service_removal(
+                "tcp",
+                "[Service] Socket Service Stopped",
+                "[Service] Socket Service Stopping Error: {error}"
+            ))
+
+        if self.enable_ws.isChecked() and self.ws_host.text() and not self.services.get('ws'):
+            ws_host = self.ws_host.text()
+            ws_port = self.ws_port.value()
+            self._safe_service_start(
+                "ws",
+                WebSocketServer(ws_host, ws_port),
+                f"[Service] WebSocket Service Started on ws://{ws_host}:{ws_port}",
+                "[Service] WebSocket Service Starting Error: {error}"
+            )
+        elif not self.enable_ws.isChecked() and self.services.get('ws'):
+            asyncio.create_task(self._safe_service_removal(
+                "ws",
+                "[Service] WebSocket Service Stopped",
+                "[Service] WebSocket Service Stopping Error: {error}"
+            ))
 
 
     def on_devices(self, devices: dict):
@@ -375,6 +472,31 @@ class DeviceTab(QWidget):
             if widget is not None:
                 widget.deleteLater()
                 i += 1
+
+
+    def _safe_service_start(self, name: str, service : Union[APIServer, SocketServer, WebSocketServer], success: str, failure: str):
+        try:
+            self.pipeline.hub.register(service.sub)
+            self.tasks[name] = asyncio.create_task(service.start())
+            self.services[name] = service
+            self.data_log.append(success + "\n")
+        except Exception as e:
+            self.data_log.append(failure.format(error=e) + "\n")
+
+
+    async def _safe_service_removal(self, short: str, success: str, failure: str):
+        service = self.services.get(short)
+        task = self.tasks.get(short)
+        self.pipeline.hub.remove(service.sub)
+        try:
+            await service.close()
+            task.cancel()
+            await task
+            self.services[short] = None
+            self.tasks[short] = None
+            self.data_log.append(success + "\n")
+        except Exception as e:
+            self.data_log.append(failure.format(error=e) + "\n")
 
 
     def notify_sub(self, data: Measurement):

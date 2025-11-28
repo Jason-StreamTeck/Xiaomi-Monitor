@@ -19,8 +19,9 @@ class NotificationHub:
         self.verbose = verbose
         self.latest_data = None
 
-    def clear(self):
-        self.subs = []
+    def remove(self, sub):
+        if sub in self.subs:
+            self.subs.remove(sub)
 
     def set_interval(self, interval):
         self.interval = interval

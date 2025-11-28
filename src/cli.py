@@ -56,12 +56,12 @@ async def main(args):
     pipeline = SensorPipeline(args.interval, args.verbose)
 
     logger = FileLogger(args.output_file, args.file_mode)
-    pipeline.register(logger.sub)
+    pipeline.hub.register(logger.sub)
 
     if args.enable_api:
         if args.api_url:
             api_server = APIServer();
-            pipeline.register(api_server.sub)
+            pipeline.hub.register(api_server.sub)
             await api_server.start(args.api_url)
         else:
             print("[API] Server could not initiate, url was not provided...")
@@ -72,7 +72,7 @@ async def main(args):
         
         if host and port:
             socket_server = SocketServer(host, port, args.verbose)
-            pipeline.register(socket_server.sub)
+            pipeline.hub.register(socket_server.sub)
             await socket_server.start()
         else:
             print("[Socket] Server could not initiate, host and port was not provided...")
@@ -83,7 +83,7 @@ async def main(args):
         
         if host and port:
             ws_server = WebSocketServer(host, port, args.verbose)
-            pipeline.register(ws_server.sub)
+            pipeline.hub.register(ws_server.sub)
             await ws_server.start()
         else:
             print("[WS] Server could not initiate, host and port was not provided...")
@@ -131,7 +131,7 @@ async def main(args):
                 print(f"Attempting to connect with device...")
                 await asyncio.create_task(pipeline.connect())
 
-                print(f"Successfully established a connection with {self.address}.")
+                print(f"Successfully established a connection with {pipeline.address}.")
 
                 loop = asyncio.get_event_loop()
                 event = asyncio.Event()

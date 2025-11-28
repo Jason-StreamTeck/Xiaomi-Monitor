@@ -4,7 +4,7 @@ from core import Measurement
 from typing import Set
 
 class SocketServer:
-    def __init__(self, host: str, port: int, verbose: bool):
+    def __init__(self, host: str, port: int, verbose: bool = False):
         self.host = host
         self.port = port
         self.clients: Set[asyncio.StreamWriter] = set()

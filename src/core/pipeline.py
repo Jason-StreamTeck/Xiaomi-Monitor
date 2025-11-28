@@ -72,9 +72,6 @@ class SensorPipeline:
             await client.write_gatt_char(O2_WRITE_CHAR, ENABLE_REALTIME)
             await asyncio.sleep(interval or 1)
 
-    def register(self, sub):
-        self.hub.register(sub)
-
     async def close(self):
         if self.send_task:
             self.send_task.cancel()
