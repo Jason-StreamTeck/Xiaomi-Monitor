@@ -1,6 +1,6 @@
-## Usage Instructions
+# Usage Instructions
 
-### General Instructions for Both Usage Streams
+## General Instructions for Both Usage Streams
 
 1) Navigate to this directory
 
@@ -22,7 +22,7 @@ pip install -r requirements.txt
 - Optionally, fill `SOCKET_HOST` and `SOCKET_PORT` fields for Socket data transmission.
 - Optionally, fill `WEBSOCKET_HOST` and `WEBSOCKET_PORT` fields WebSocket data transmission.
 
-### Command-Line Interface (CLI)
+## Command-Line Interface (CLI)
 
 1) Run the service
 ```bash
@@ -82,7 +82,7 @@ python ./clients/socket_client.py
 python ./clients/ws_client.py
 ```
 
-### Graphical User Interface (GUI)
+## Graphical User Interface (GUI)
 
 1) Run the service
 ```bash
@@ -90,15 +90,27 @@ cd src
 python ui.py
 ```
 
+![Default UI appearance on program initiation](visuals/ui-1.png)
+
 2) Set your desired scan duration per scan (in seconds) in the 'Scan Duration' field.
+
+![Highlight of the scan duration user input field](visuals/ui-2.png)
 
 3) Repeatedly click the button labelled 'Scan for Devices' until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list.
 
+![Repeatedly clicking the scan for devices button to refresh devices list](visuals/ui-3.png)
+
 4) Double click the row of the LYWSD03MMC device within the BLE Devices list to select the device (Selection is reflected on the label in the top part of the middle section)
+
+![Double click the Mi Monitor 2 device in the device list](visuals/ui-4.png)
 
 5) Set your desired data transmission period from 1 second to 604800 seconds (1 week) in the 'Data Capture Interval' field.
 
-6) On the right side, set the desired file name and location for the output `.csv` file.
+![Highlight of the data capture interval user input field](visuals/ui-5.png)
+
+6) On the right side, set the desired file name and location for the output `.csv` file (This form autosaves as you edit). If no specific location is chosen through the button labelled 'Browse...', the same directory as the `ui.py` file will be used.
+
+![Highlight of the file output user input form](visuals/ui-6.png)
 
 7) Repeatedly click the button labelled 'Connect' until the device has successfully connected, dismissing the following errors that pop up (if program does not exit):
 
@@ -106,7 +118,11 @@ python ui.py
 - `Device with address ##:##:##:##:##:## was not found.`
 - A Blank Error
 
+![Repeatedly clicking the connect button while dismissing any error pop ups](visuals/ui-7.png)
+
 8) Check the contents of the data log and the selected output `.csv` file for updated data.
+
+![Highlight of the data log with real-time updated monitoring data](visuals/ui-8.png)
 
 9) Terminate the program by clicking the exit button on the top right corner of the UI.
 
@@ -120,7 +136,7 @@ python ui.py
 
 To disconnect any optional services server, simply uncheck the checkbox and click the button labelled 'Apply Services' again.
 
-## Program Compatiblity
+# Program Compatiblity
 
 This program supports the following BLE devices:
 
