@@ -58,12 +58,18 @@ python cli.py -s -sh 127.0.0.1 -sp 55555
 
 2) Repeatedly scan (input 'r') until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list of BLE devices and can be selected.
 
-3) Repeatedly attempt to connect to the BLE device, ignoring the following errors (if program does not exit):
+![Program device scanning phase appearance](visuals/cli-1.png)
+
+3) Repeatedly attempt to connect (input 'r' or just 'a' once) to the BLE device, ignoring the following errors (if program does not exit):
 - `Could not get GATT services: Unreachable`
 - `Device with address ##:##:##:##:##:## was not found.`
 - A Blank Error
 
+![Program device attempting connection phase appearance](visuals/cli-2.png)
+
 4) Check the contents of the output `.csv` file for updated data.
+
+![Log of real-time updated monitoring data extracted from the BLE device](visuals/cli-3.png)
 
 5) Terminate the program.
 
