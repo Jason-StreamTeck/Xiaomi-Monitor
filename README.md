@@ -1,4 +1,6 @@
-### Usage Instructions
+## Usage Instructions
+
+### General Instructions for Both Usage Streams
 
 1) Navigate to this directory
 
@@ -20,7 +22,9 @@ pip install -r requirements.txt
 - Optionally, fill `SOCKET_HOST` and `SOCKET_PORT` fields for Socket data transmission.
 - Optionally, fill `WEBSOCKET_HOST` and `WEBSOCKET_PORT` fields WebSocket data transmission.
 
-6) Run the service
+### Command-Line Interface (CLI)
+
+1) Run the service
 ```bash
 cd src
 python cli.py
@@ -52,23 +56,73 @@ python cli.py -s -sh 127.0.0.1 -sp 55555
 | `-wsp` | `--ws-port`          | `int`          | *None*             | Port number of the WebSocket server.                                |
 | `-i`   | `--interval`         | `int`          | *None*             | Interval (in seconds) between each data transmission (default is device minimum, ~6s).      |
 
-7) Repeatedly scan until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list of BLE devices and can be selected.
+2) Repeatedly scan (input 'r') until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list of BLE devices and can be selected.
 
-8) Repeatedly attempt to connect to the BLE device, ignoring the following errors (if program does not exit):
+3) Repeatedly attempt to connect to the BLE device, ignoring the following errors (if program does not exit):
 - `Could not get GATT services: Unreachable`
 - `Device with address ##:##:##:##:##:## was not found.`
 - A Blank Error
 
-9) Check the contents of the output CSV file for updated data.
+4) Check the contents of the output `.csv` file for updated data.
 
-10) Terminate the program.
+5) Terminate the program.
 
-11) (Optional) Run the dummy API client to mock retrieve measurement data
+(Optional) Run the dummy API client to mock retrieve measurement data (if an API server was started in step 1)
 ```bash
 python ./clients/api_client.py
 ```
 
-12) (Optional) Run the dummy Socket client to mock retrieve measurement data
+(Optional) Run the dummy Socket client to mock retrieve measurement data (if a Socket server was started in step 1)
 ```bash
 python ./clients/socket_client.py
 ```
+
+(Optional) Run the dummy WebSocket client to mock retrieve measurement data (if a WebSocket server was started in step 1)
+```bash
+python ./clients/ws_client.py
+```
+
+### Graphical User Interface (GUI)
+
+1) Run the service
+```bash
+cd src
+python ui.py
+```
+
+2) Set your desired scan duration per scan (in seconds) in the 'Scan Duration' field.
+
+3) Repeatedly click the button labelled 'Scan for Devices' until the `Mi Temperature and Humidity Monitor 2` (LYWSD03MMC) device is on the list.
+
+4) Double click the row of the LYWSD03MMC device within the BLE Devices list to select the device (Selection is reflected on the label in the top part of the middle section)
+
+5) Set your desired data transmission period from 1 second to 604800 seconds (1 week) in the 'Data Capture Interval' field.
+
+6) On the right side, set the desired file name and location for the output `.csv` file.
+
+7) Repeatedly click the button labelled 'Connect' until the device has successfully connected, dismissing the following errors that pop up (if program does not exit):
+
+- `Could not get GATT services: Unreachable`
+- `Device with address ##:##:##:##:##:## was not found.`
+- A Blank Error
+
+8) Check the contents of the data log and the selected output `.csv` file for updated data.
+
+9) Terminate the program by clicking the exit button on the top right corner of the UI.
+
+(Optional) To connect to and monitor multiple BLE devices from the same program UI, click the 'plus' button to add new tabs which can be used to connect to other BLE devices (Double click the tab header to rename).
+
+(Optional) Select the checkbox to enable an API server and add the URL in the field below (A common default URL has been provided). Then click the button labelled 'Apply Services' to start the server, signified by a text in the data log.
+
+(Optional) Select the checkbox to enable a Socket server and add the host and port in the fields below (Common default host and port have been provided). Then click the button labelled 'Apply Services' to start the server, signified by a text in the data log.
+
+(Optional) Select the checkbox to enable a WebSocket server and add the host and port in the fields below (Common default host and port have been provided). Then click the button labelled 'Apply Services' to start the server, signified by a text in the data log.
+
+To disconnect any optional services server, simply uncheck the checkbox and click the button labelled 'Apply Services' again.
+
+## Program Compatiblity
+
+This program supports the following BLE devices:
+
+- Mi Temperature and Humidity Monitor 2 (`LYWSD03MMC`)
+- Pulse Oximeter Model: PO2 (`O2Ring 8231`)

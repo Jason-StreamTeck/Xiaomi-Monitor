@@ -15,6 +15,9 @@ from PySide6.QtWidgets import (QApplication, QWidget, QTabWidget, QPushButton, Q
 from core import SensorPipeline, Measurement
 from services import FileLogger, APIServer, SocketServer, WebSocketServer
 
+MI_DEVICE_NAME = "LYWSD03MMC"
+O2_DEVICE_NAME = "O2Ring"
+
 class UiSignals(QObject):
     measurement = Signal(dict)
     status = Signal(str)
@@ -27,7 +30,6 @@ class DeviceTab(QWidget):
         self.signals = UiSignals()
         self._connecting = False
         self._connected = False
-        self._data_source = None
 
         self.logger: FileLogger | None = None
         self.services: Dict[str, Union[APIServer, SocketServer, WebSocketServer]] = {
@@ -278,6 +280,7 @@ class DeviceTab(QWidget):
             self.connect_button.setText("Connected")
             self.connect_button.setEnabled(False)
             self.stop_button.setEnabled(True)
+            self._update_gray_out(self.data_log, False)
         
         except (asyncio.CancelledError, Exception) as e:
             QMessageBox.critical(self, "Error occurred", str(e))
@@ -387,32 +390,15 @@ class DeviceTab(QWidget):
 
 
     def on_measurement(self, data: dict):
-        if not self._data_source == data["source"]:
-            self._removeAllWidgets(self.data_row_1)
-            self._removeAllWidgets(self.data_row_2)
-            self._update_gray_out(self.data_log, False)
-
-            if data["source"] == "XIAOMI":
-                self._data_source = "XIAOMI"
-                self.data_row_1.addWidget(self.ts_label)
-                self.data_row_1.addWidget(self.temp_label)
-                self.data_row_2.addWidget(self.hum_label)
-                self.data_row_2.addWidget(self.bat_label)
-            if data["source"] == "O2RING":
-                self._data_source = "O2RING"
-                self.data_row_1.addWidget(self.ts_label)
-                self.data_row_2.addWidget(self.spo2_label)
-                self.data_row_2.addWidget(self.pr_label)
-
-        ts = datetime.fromtimestamp(data['data']['timestamp'])
+        ts = datetime.fromtimestamp(data.get('data').get('timestamp'))
         self.ts_label.setText(f"Timestamp: {ts.strftime('%d/%m %H:%M:%S')}")
 
-        if self._data_source == "XIAOMI":
+        if data.get('source') == "XIAOMI":
             self.temp_label.setText(f"Temperature: {data['data']['temperature']:.1f}°C")
             self.hum_label.setText(f"Humidity: {data['data']['humidity']}%")
             self.bat_label.setText(f"Battery: {data['data']['battery']}%")
 
-        if self._data_source == "O2RING":
+        if data.get('source') == "O2RING":
             self.spo2_label.setText(f"SpO2: {data['data']['spo2']}%")
             self.pr_label.setText(f"Pulse Rate: {data['data']['pr']} BPM")
 
@@ -420,8 +406,22 @@ class DeviceTab(QWidget):
 
 
     def on_device_selected(self, device):
-        info = device.text().split(" | ")
+        info: list[str] = device.text().split(" | ")
         self.current_device.setText(f"{info[1]} ({info[0]})")
+
+        if info[1] == MI_DEVICE_NAME or info[1].startswith(O2_DEVICE_NAME):
+            self._removeAllWidgets(self.data_row_1)
+            self._removeAllWidgets(self.data_row_2)
+
+            if info[1] == MI_DEVICE_NAME:
+                self.data_row_1.addWidget(self.ts_label)
+                self.data_row_1.addWidget(self.temp_label)
+                self.data_row_2.addWidget(self.hum_label)
+                self.data_row_2.addWidget(self.bat_label)
+            if info[1].startswith(O2_DEVICE_NAME):
+                self.data_row_1.addWidget(self.ts_label)
+                self.data_row_2.addWidget(self.spo2_label)
+                self.data_row_2.addWidget(self.pr_label)
 
         self.connect_button.setEnabled(True)
         self.connect_button.setText("Connect")

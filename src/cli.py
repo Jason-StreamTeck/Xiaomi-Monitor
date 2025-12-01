@@ -13,12 +13,6 @@ class AppState(Enum):
     CONNECT = auto()
     QUIT = auto()
 
-MI_DEVICE_NAME = "LYWSD03MMC"
-MI_NOTIFY_CHAR = os.getenv('MI_CHARACTERISTIC', 0)
-O2_DEVICE_NAME = "O2Ring"
-O2_NOTIFY_CHAR = os.getenv('O2_NOTIFY_CHAR', 0)
-O2_WRITE_CHAR = os.getenv('O2_WRITE_CHAR', 0)
-ENABLE_REALTIME = bytes([0xAA, 0x17, 0xE8, 0x00, 0x00, 0x00, 0x00, 0x1B]) # From middleware-rust by Joe Huang
 SOCKET_HOST = os.getenv("SOCKET_HOST")
 SOCKET_PORT = int(os.getenv("SOCKET_PORT", '55555'))
 WEBSOCKET_HOST = os.getenv("WEBSOCKET_HOST")
