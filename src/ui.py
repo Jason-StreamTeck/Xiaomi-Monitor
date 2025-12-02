@@ -4,6 +4,8 @@ from asyncio import Task
 import qasync
 from datetime import datetime
 from typing import Dict, Union
+import pyqtgraph as pg
+from pyqtgraph import PlotWidget
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QPalette, QColor, QMovie
@@ -30,6 +32,7 @@ class DeviceTab(QWidget):
         self.signals = UiSignals()
         self._connecting = False
         self._connected = False
+        self._device_info: list[str] = []
 
         self.logger: FileLogger | None = None
         self.services: Dict[str, Union[APIServer, SocketServer, WebSocketServer]] = {
@@ -103,6 +106,19 @@ class DeviceTab(QWidget):
         connection_controls.addWidget(self.connect_button)
         connection_controls.addWidget(self.stop_button)
 
+        self.toggle_data_button = QPushButton("Toggle Graph View")
+        self.toggle_data_button.setEnabled(False)
+
+        self.data_graph = pg.PlotWidget()
+        self.data_graph.hide()
+        self.data_graph.setBackground('w')
+
+        self.data_graph.getPlotItem().setLabel("left", "Value")
+        self.data_graph.getPlotItem().setLabel("bottom", "Timestamp (s)")
+
+        self.plot_manager = DeviceTab.PlotManager()
+        self.plot_manager.attach(self.data_graph)
+
         self.data_log = QTextEdit()
         self.data_log.setReadOnly(True)
         self.data_log.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -140,7 +156,9 @@ class DeviceTab(QWidget):
         mid_label_data = QLabel("Live Data")
         self.mid_layout.addWidget(mid_label_data)
         self.mid_layout.addLayout(latest_data_layout)
+        self.mid_layout.addWidget(self.data_graph)
         self.mid_layout.addWidget(self.data_log)
+        self.mid_layout.addWidget(self.toggle_data_button)
 
         self._update_gray_out(self.data_log, not bool(self.data_log.toPlainText()))
 
@@ -231,9 +249,53 @@ class DeviceTab(QWidget):
         self.stop_button.clicked.connect(self.on_stop_clicked)
         self.file_browse_button.clicked.connect(self.on_browse_clicked)
         self.services_button.clicked.connect(self.on_services_clicked)
+        self.toggle_data_button.clicked.connect(self.on_toggle_data_clicked)
 
         self.signals.devices.connect(self.on_devices)
         self.signals.measurement.connect(self.on_measurement)
+
+
+
+    class PlotManager:
+        def __init__(self):
+            self.x = []
+            self.a = []
+            self.b = []
+            self.data_cap = 100
+            self.plot = None
+            self.curve_a = None
+            self.curve_b = None
+
+        
+        def attach(self, widget: PlotWidget):
+            self.plot = widget
+            self.curve_a = widget.getPlotItem().plot(pen='r', name='A')
+            self.curve_b = widget.getPlotItem().plot(pen='b', name='B')
+
+
+        def set_range(self, min, max):
+            if self.plot:
+                self.plot.setYRange(min, max)
+
+
+        def add(self, t, a, b):
+            self.x.append(t)
+            self.a.append(a)
+            self.b.append(b)
+
+            if len(self.x) > self.data_cap:
+                self.x.pop(0)
+                self.a.pop(0)
+                self.b.pop(0)
+
+            self.curve_a.setData(self.x, self.a)
+            self.curve_b.setData(self.x, self.b)
+
+        def clear(self):
+            self.x = []
+            self.a = []
+            self.b = []
+
 
 
     @qasync.asyncSlot()
@@ -317,6 +379,7 @@ class DeviceTab(QWidget):
             self.scan_button.setEnabled(True)
             self.file_group.setEnabled(True)
             self.devices.setEnabled(True)
+            self.toggle_data_button.setEnabled(True)
 
 
     def on_browse_clicked(self):
@@ -382,6 +445,17 @@ class DeviceTab(QWidget):
             ))
 
 
+    def on_toggle_data_clicked(self):
+        if self.data_graph.isVisible():
+            self.data_graph.hide()
+            self.data_log.show()
+            self.toggle_data_button.setText("Toggle Graph View")
+        else:
+            self.data_graph.show()
+            self.data_log.hide()
+            self.toggle_data_button.setText("Toggle Log View")
+
+
     def on_devices(self, devices: dict):
         self.devices.clear()
         for device in devices:
@@ -390,38 +464,57 @@ class DeviceTab(QWidget):
 
 
     def on_measurement(self, data: dict):
-        ts = datetime.fromtimestamp(data.get('data').get('timestamp'))
-        self.ts_label.setText(f"Timestamp: {ts.strftime('%d/%m %H:%M:%S')}")
+        ts = data.get('data').get('timestamp')
+        dt = datetime.fromtimestamp(ts)
+        self.ts_label.setText(f"Timestamp: {dt.strftime('%d/%m %H:%M:%S')}")
+
+        self.toggle_data_button.setEnabled(True)
 
         if data.get('source') == "XIAOMI":
-            self.temp_label.setText(f"Temperature: {data['data']['temperature']:.1f}°C")
-            self.hum_label.setText(f"Humidity: {data['data']['humidity']}%")
-            self.bat_label.setText(f"Battery: {data['data']['battery']}%")
+            temp = data.get('data').get('temperature')
+            hum = data.get('data').get('humidity')
+
+            self.temp_label.setText(f"Temperature: {temp:.1f}°C")
+            self.hum_label.setText(f"Humidity: {hum}%")
+            self.bat_label.setText(f"Battery: {data.get('data').get('battery')}%")
+
+            self.plot_manager.add(ts, temp, hum)
 
         if data.get('source') == "O2RING":
-            self.spo2_label.setText(f"SpO2: {data['data']['spo2']}%")
-            self.pr_label.setText(f"Pulse Rate: {data['data']['pr']} BPM")
+            spo2 = data.get('data').get('spo2')
+            pr = data.get('data').get('pr')
+
+            self.spo2_label.setText(f"SpO2: {spo2}%")
+            self.pr_label.setText(f"Pulse Rate: {pr} BPM")
+
+            self.plot_manager.add(ts, spo2, pr)
 
         self.data_log.append(f"{str(data)}\n")
 
 
     def on_device_selected(self, device):
-        info: list[str] = device.text().split(" | ")
-        self.current_device.setText(f"{info[1]} ({info[0]})")
+        if not device.text().split(" | ") == self._device_info:
+            self.plot_manager.clear()
 
-        if info[1] == MI_DEVICE_NAME or info[1].startswith(O2_DEVICE_NAME):
-            self._removeAllWidgets(self.data_row_1)
-            self._removeAllWidgets(self.data_row_2)
+        self._device_info = device.text().split(" | ")
+        self.current_device.setText(f"{self._device_info[1]} ({self._device_info[0]})")
 
-            if info[1] == MI_DEVICE_NAME:
+        self._removeAllWidgets(self.data_row_1)
+        self._removeAllWidgets(self.data_row_2)
+
+        if self._device_info[1] == MI_DEVICE_NAME or self._device_info[1].startswith(O2_DEVICE_NAME):
+            if self._device_info[1] == MI_DEVICE_NAME:
                 self.data_row_1.addWidget(self.ts_label)
                 self.data_row_1.addWidget(self.temp_label)
                 self.data_row_2.addWidget(self.hum_label)
                 self.data_row_2.addWidget(self.bat_label)
-            if info[1].startswith(O2_DEVICE_NAME):
+                self.plot_manager.set_range(0, 100)
+
+            if self._device_info[1].startswith(O2_DEVICE_NAME):
                 self.data_row_1.addWidget(self.ts_label)
                 self.data_row_2.addWidget(self.spo2_label)
                 self.data_row_2.addWidget(self.pr_label)
+                self.plot_manager.set_range(0, 250)
 
         self.connect_button.setEnabled(True)
         self.connect_button.setText("Connect")
@@ -465,13 +558,15 @@ class DeviceTab(QWidget):
 
 
     def _removeAllWidgets(self, layout: QBoxLayout):
-        i = 0
-        while layout.count():
-            item = layout.takeAt(i)
+        if layout.count() == 0:
+            return
+
+        while layout.count() > 0:
+            item = layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
-                widget.deleteLater()
-                i += 1
+                layout.removeWidget(widget)
+                widget.setParent(None)
 
 
     def _safe_service_start(self, name: str, service : Union[APIServer, SocketServer, WebSocketServer], success: str, failure: str):
